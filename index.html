@@ -1,0 +1,1983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cumin</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'><path d='M 50 88 Q 46 65 52 50 Q 58 35 50 16' fill='none' stroke='%231E8E5A' stroke-width='4' stroke-linecap='round'/><ellipse cx='34' cy='88' rx='8' ry='3.6' fill='%23B98D47' transform='rotate(-8 34 88)'/><ellipse cx='42' cy='88' rx='8' ry='3.6' fill='%236B4F23' transform='rotate(4 42 88)'/><ellipse cx='50' cy='88' rx='8' ry='3.6' fill='%237A5A28' transform='rotate(0 50 88)'/><ellipse cx='58' cy='88' rx='8' ry='3.6' fill='%23A67C3B' transform='rotate(-4 58 88)'/><ellipse cx='66' cy='88' rx='8' ry='3.6' fill='%238B6A2E' transform='rotate(8 66 88)'/><ellipse cx='36' cy='63' rx='8' ry='3.6' fill='%232FAE6B' transform='rotate(-50 36 63)'/><ellipse cx='66' cy='45' rx='8' ry='3.6' fill='%231D9E75' transform='rotate(40 66 45)'/><ellipse cx='38' cy='29' rx='7' ry='3.2' fill='%236FCF6F' transform='rotate(-35 38 29)'/><circle cx='50' cy='14' r='5' fill='%23C98A2E'/><circle cx='40' cy='20' r='4' fill='%23E0A83E'/><circle cx='60' cy='20' r='4' fill='%23D8724A'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   CUMIN — Design tokens
+   ============================================================ */
+:root{
+  --bg:#F3F4F9;
+  --surface:#FFFFFF;
+  --surface-alt:#F7F8FB;
+  --border:#E2E4EC;
+  --ink:#1E2233;
+  --ink-soft:#5B6072;
+  --ink-faint:#9498A8;
+  --primary:#4F5FE0;
+  --primary-dark:#3F4DC4;
+  --primary-soft:#EBEDFB;
+  --warm:#C98A2E;
+  --warm-dark:#A9701E;
+  --warm-soft:#F7EDDC;
+  --green:#1E8E5A;
+  --green-soft:#E4F3EC;
+  --amber:#B97A1D;
+  --amber-soft:#F6ECDA;
+  --red:#C4432E;
+  --red-soft:#FAE8E4;
+  --shadow-sm:0 1px 2px rgba(30,34,51,0.05);
+  --shadow-md:0 4px 16px rgba(30,34,51,0.07);
+  --shadow-lg:0 16px 40px rgba(30,34,51,0.14);
+  --radius-sm:6px;
+  --radius-md:10px;
+  --radius-lg:14px;
+  --font-display:'Fraunces', serif;
+  --font-body:'Manrope', sans-serif;
+  --font-mono:'IBM Plex Mono', monospace;
+  --transition-fast:0.12s ease;
+  --transition-med:0.2s ease;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  font-family:var(--font-body);
+  color:var(--ink);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+a{color:inherit;}
+::selection{background:var(--warm-soft);}
+
+/* Ambient blobs on auth screen */
+.blob{
+  position:fixed;border-radius:50%;filter:blur(90px);
+  opacity:0.15;z-index:0;pointer-events:none;
+  animation:blobDrift 14s ease-in-out infinite alternate;
+}
+@keyframes blobDrift{
+  0%{transform:scale(1) translate(0,0);}
+  100%{transform:scale(1.08) translate(12px,18px);}
+}
+
+/* ============================================================
+   Layout
+   ============================================================ */
+#app{min-height:100vh;}
+.hidden{display:none !important;}
+
+/* Topbar */
+.topbar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:14px;
+  padding:12px 28px;
+  background:rgba(238,241,252,0.88);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.wordmark{
+  font-family:var(--font-display);
+  font-weight:700;font-size:21px;letter-spacing:-0.01em;
+  display:flex;align-items:center;gap:7px;
+  user-select:none;
+}
+.cumin-mark{width:26px;height:26px;flex-shrink:0;transition:transform .25s;}
+.cumin-mark:hover{animation:cuminWiggle .6s ease;}
+.auth-wordmark .cumin-mark{width:34px;height:34px;vertical-align:middle;margin-right:6px;}
+
+/* Cumin plant animation */
+.cumin-mark .seed{
+  opacity:0;
+  transform-box:fill-box;transform-origin:center;
+  animation:seedJourney 1.3s cubic-bezier(.4,1.1,.4,1) forwards;
+}
+.cumin-mark .stem{
+  fill:none;stroke:#1E8E5A;stroke-width:4;stroke-linecap:round;
+  stroke-dasharray:110;stroke-dashoffset:110;
+  animation:growStem .4s ease forwards;animation-delay:1.3s;
+}
+.cumin-mark .leaf{
+  opacity:0;transform-box:fill-box;transform-origin:center;transform:scale(.2);
+  animation:leafPop .3s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+.cumin-mark .pod{
+  opacity:0;transform-box:fill-box;transform-origin:center;transform:scale(.2);
+  animation:podPop .32s cubic-bezier(.34,1.7,.64,1) forwards;
+}
+@keyframes seedJourney{
+  0%{opacity:0;transform:translate(var(--sx),var(--sy)) scale(.3);}
+  30%{opacity:1;transform:translate(0,0) scale(1);}
+  60%{opacity:1;transform:translate(0,0) scale(1);}
+  100%{opacity:1;transform:translate(var(--bx),var(--by)) scale(.8);}
+}
+@keyframes growStem{to{stroke-dashoffset:0;}}
+@keyframes leafPop{to{opacity:1;transform:scale(1);}}
+@keyframes podPop{to{opacity:1;transform:scale(1);}}
+@keyframes cuminWiggle{
+  0%,100%{transform:rotate(0deg);}
+  25%{transform:rotate(-8deg);}
+  75%{transform:rotate(8deg);}
+}
+
+.topbar-spacer{flex:1;}
+
+/* Search */
+.search-wrap{position:relative;width:280px;max-width:40vw;}
+.search-input{
+  width:100%;padding:8px 14px 8px 36px;
+  border-radius:999px;border:1px solid var(--border);
+  background:var(--surface);font-size:13.5px;outline:none;
+  transition:box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+.search-input:focus{box-shadow:0 0 0 3px var(--primary-soft);border-color:var(--primary);}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.45;pointer-events:none;}
+.search-results{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-md);box-shadow:var(--shadow-md);
+  max-height:320px;overflow-y:auto;z-index:50;
+}
+.search-result-item{
+  padding:10px 14px;font-size:13.5px;
+  border-bottom:1px solid var(--border);cursor:pointer;
+  transition:background var(--transition-fast);
+}
+.search-result-item:last-child{border-bottom:none;}
+.search-result-item:hover{background:var(--surface-alt);}
+.search-result-type{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint);font-family:var(--font-mono);margin-bottom:2px;}
+
+/* Icon buttons */
+.icon-btn{
+  width:36px;height:36px;border-radius:50%;border:1px solid var(--border);
+  background:var(--surface);display:flex;align-items:center;justify-content:center;
+  font-size:16px;position:relative;transition:transform var(--transition-fast), box-shadow var(--transition-fast);
+  flex-shrink:0;
+}
+.icon-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm);}
+.badge{
+  position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;
+  font-size:10px;font-weight:700;min-width:16px;height:16px;
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  padding:0 4px;font-family:var(--font-mono);border:1.5px solid var(--surface);
+}
+
+/* Notification dropdown */
+.notif-dropdown{
+  position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);
+  width:340px;max-height:400px;overflow-y:auto;z-index:50;
+}
+.notif-header{padding:13px 16px;font-weight:800;font-size:12.5px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);}
+.notif-item{
+  padding:12px 16px;border-bottom:1px solid var(--border);
+  display:flex;gap:10px;align-items:flex-start;font-size:13px;cursor:pointer;
+  transition:background var(--transition-fast);
+}
+.notif-item:hover{background:var(--surface-alt);}
+.notif-dot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+.notif-empty{padding:32px 16px;text-align:center;color:var(--ink-faint);font-size:13px;}
+
+/* Avatar & user menu */
+.avatar-chip{
+  width:36px;height:36px;border-radius:50%;background:var(--warm-soft);
+  display:flex;align-items:center;justify-content:center;font-size:17px;border:1px solid var(--border);
+}
+.user-menu-wrap{position:relative;}
+.user-menu{
+  position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);
+  min-width:190px;overflow:hidden;z-index:50;
+}
+.user-menu button{
+  display:block;width:100%;text-align:left;padding:11px 16px;
+  border:none;background:none;font-size:13.5px;font-weight:500;
+  transition:background var(--transition-fast);
+}
+.user-menu button:hover{background:var(--surface-alt);}
+
+/* Page container */
+.container{max-width:1180px;margin:0 auto;padding:28px;}
+
+/* ============================================================
+   Auth screen
+   ============================================================ */
+#authScreen{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+.auth-card{
+  position:relative;z-index:1;background:var(--surface);border-radius:var(--radius-lg);
+  padding:44px 40px;width:390px;max-width:calc(100vw - 32px);
+  box-shadow:var(--shadow-lg);border:1px solid var(--border);
+}
+.auth-wordmark{font-family:var(--font-display);font-size:24px;font-weight:600;margin:0 0 4px;color:var(--ink);}
+.auth-sub{color:var(--ink-soft);font-size:13.5px;margin:0 0 26px;line-height:1.5;}
+
+/* Form fields */
+.field{margin-bottom:16px;}
+.field label{
+  display:block;font-size:11.5px;font-weight:800;color:var(--ink-soft);
+  margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;
+}
+.field input,.field select,.field textarea{
+  width:100%;padding:11px 13px;border-radius:var(--radius-sm);
+  border:1.5px solid var(--border);font-size:14px;outline:none;
+  background:var(--surface-alt);
+  transition:border-color var(--transition-fast), background var(--transition-fast);
+}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary);background:var(--surface);}
+.field textarea{resize:vertical;min-height:72px;line-height:1.5;}
+.password-wrap{position:relative;}
+.password-wrap input{padding-right:44px;}
+.password-eye{
+  position:absolute;right:4px;top:50%;transform:translateY(-50%);
+  background:none;border:none;width:34px;height:34px;border-radius:8px;
+  font-size:15px;opacity:.5;display:flex;align-items:center;justify-content:center;
+  transition:opacity var(--transition-fast);
+}
+.password-eye:hover{opacity:1;background:var(--surface-alt);}
+
+/* Buttons */
+.btn{
+  border:none;border-radius:999px;padding:11px 22px;font-weight:700;font-size:13.5px;
+  transition:transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast), background var(--transition-fast);
+  white-space:nowrap;
+}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:var(--primary);color:#fff;}
+.btn-primary:hover{background:var(--primary-dark);}
+.btn-warm{background:var(--warm);color:#3D2600;}
+.btn-warm:hover{background:var(--warm-dark);}
+.btn-ghost{background:none;color:var(--ink-soft);border:1.5px solid var(--border);}
+.btn-ghost:hover{background:var(--surface-alt);}
+.btn-danger{background:var(--red-soft);color:var(--red);}
+.btn-danger:hover{opacity:.8;}
+.btn-block{width:100%;}
+.btn-sm{padding:6px 14px;font-size:12px;}
+.link-btn{background:none;border:none;color:var(--primary);font-weight:700;font-size:13px;padding:0;cursor:pointer;}
+.link-btn:hover{opacity:.75;}
+
+/* Messages */
+.error-msg{
+  background:var(--red-soft);color:var(--red);padding:10px 14px;
+  border-radius:var(--radius-sm);font-size:13px;margin-bottom:16px;font-weight:600;
+}
+.success-msg{
+  background:var(--green-soft);color:var(--green);padding:10px 14px;
+  border-radius:var(--radius-sm);font-size:13px;margin-bottom:16px;font-weight:600;
+}
+
+/* ============================================================
+   Home screen
+   ============================================================ */
+.greeting-banner{
+  background:var(--surface);border:1px solid var(--border);
+  border-left:3px solid var(--warm);border-radius:var(--radius-lg);
+  padding:26px 30px;margin-bottom:20px;position:relative;overflow:hidden;
+}
+.greeting-banner h1{font-family:var(--font-display);font-size:24px;font-weight:600;margin:0 0 3px;color:var(--ink);}
+.greeting-banner p{margin:0;color:var(--ink-soft);font-size:13.5px;font-weight:500;}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:18px;}
+.stat-card{
+  background:var(--surface-alt);border:1px solid var(--border);
+  border-radius:var(--radius-md);padding:14px 16px;
+}
+.stat-num{font-family:var(--font-mono);font-size:21px;font-weight:600;color:var(--ink);}
+.stat-label{font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+
+.section-title{
+  font-family:var(--font-display);font-size:17px;font-weight:600;
+  margin:26px 0 13px;color:var(--ink);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.section-title span.count{font-family:var(--font-mono);font-size:12px;color:var(--ink-faint);font-weight:500;}
+
+/* Filter chips */
+.chip-row{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:17px;}
+.chip{
+  padding:6px 15px;border-radius:999px;font-size:12.5px;font-weight:700;
+  border:1.5px solid var(--border);background:var(--surface);color:var(--ink-soft);
+  transition:all var(--transition-fast);cursor:pointer;
+}
+.chip.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+.chip:hover:not(.active){border-color:var(--primary);color:var(--primary);}
+
+/* Team grid */
+.team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:13px;}
+.team-card{
+  background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);
+  overflow:hidden;cursor:pointer;
+  transition:box-shadow var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+.team-card:hover{box-shadow:var(--shadow-md);border-color:var(--ink-faint);transform:translateY(-2px);}
+.team-card-roof{height:3px;}
+.team-card-body{padding:16px 18px;}
+.team-card-avatar{
+  width:42px;height:42px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:20px;margin-bottom:10px;
+  background:var(--surface-alt);border:1px solid var(--border);
+}
+.team-card-name{font-weight:700;font-size:14px;margin-bottom:10px;color:var(--ink);}
+.team-card-stats{display:flex;gap:12px;}
+.tcs-item{text-align:left;}
+.tcs-num{font-family:var(--font-mono);font-weight:600;font-size:15px;}
+.tcs-label{font-size:9px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;font-weight:700;}
+
+/* Daily summary table */
+.summary-table-wrap{
+  background:var(--surface);border-radius:var(--radius-md);
+  border:1px solid var(--border);overflow:hidden;
+}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{
+  text-align:left;padding:11px 14px;background:var(--surface-alt);
+  font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--ink-soft);font-weight:800;border-bottom:1px solid var(--border);
+}
+td{padding:10px 14px;border-bottom:1px solid var(--border);font-family:var(--font-mono);}
+td.name-cell{font-family:var(--font-body);font-weight:700;}
+tr:last-child td{border-bottom:none;}
+tr.total-row td{font-weight:800;background:var(--surface-alt);}
+tr:not(.total-row):hover td{background:var(--surface-alt);}
+
+/* ============================================================
+   Modal / overlay
+   ============================================================ */
+.overlay{
+  position:fixed;inset:0;background:rgba(30,34,51,0.45);z-index:100;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  backdrop-filter:blur(3px);animation:overlayIn .15s ease;
+}
+@keyframes overlayIn{from{opacity:0;}to{opacity:1;}}
+.modal{
+  background:var(--surface);border-radius:var(--radius-lg);
+  width:490px;max-width:100%;max-height:90vh;overflow-y:auto;
+  box-shadow:var(--shadow-lg);animation:modalIn .18s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(8px);}to{opacity:1;transform:none;}}
+.modal-header{
+  padding:21px 26px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;background:var(--surface);z-index:1;
+}
+.modal-header h2{font-family:var(--font-display);font-size:18px;margin:0;font-weight:600;}
+.modal-close{
+  background:none;border:none;font-size:19px;color:var(--ink-faint);
+  width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  transition:background var(--transition-fast);
+}
+.modal-close:hover{background:var(--surface-alt);}
+.modal-body{padding:22px 26px;}
+.modal-footer{
+  padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;
+  position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--border);
+}
+
+/* Type picker (Add modal) */
+.type-picker{display:flex;flex-direction:column;gap:10px;}
+.type-picker button{
+  display:flex;align-items:center;gap:13px;padding:15px 16px;
+  border-radius:var(--radius-md);border:1.5px solid var(--border);
+  background:var(--surface-alt);text-align:left;font-weight:700;font-size:14px;
+  transition:border-color var(--transition-fast), background var(--transition-fast);
+}
+.type-picker button:hover{border-color:var(--primary);background:var(--primary-soft);}
+.tp-icon{font-size:21px;}
+.tp-sub{font-size:12px;font-weight:500;color:var(--ink-soft);display:block;margin-top:2px;}
+
+/* ============================================================
+   Workspace view
+   ============================================================ */
+.workspace-header{
+  display:flex;align-items:center;gap:16px;background:var(--surface);
+  border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;
+  border:1px solid var(--border);flex-wrap:wrap;
+}
+.ws-avatar{
+  width:50px;height:50px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:22px;background:var(--surface-alt);border:1px solid var(--border);
+  flex-shrink:0;
+}
+.ws-name{font-family:var(--font-display);font-size:19px;font-weight:600;margin:0;color:var(--ink);}
+.ws-meta{color:var(--ink-soft);font-size:12.5px;margin-top:3px;}
+.ws-spacer{flex:1;}
+.back-link{
+  display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;
+  color:var(--ink-soft);background:none;border:none;margin-bottom:12px;
+  transition:color var(--transition-fast);padding:0;
+}
+.back-link:hover{color:var(--primary);}
+
+.tab-row{
+  display:flex;gap:5px;margin-bottom:18px;background:var(--surface);
+  border:1px solid var(--border);border-radius:999px;padding:4px;width:fit-content;flex-wrap:wrap;
+}
+.tab-btn{
+  padding:7px 17px;border-radius:999px;border:none;background:none;
+  font-weight:700;font-size:13px;color:var(--ink-soft);
+  transition:all var(--transition-fast);
+}
+.tab-btn.active{background:var(--primary);color:#fff;}
+.tab-btn:hover:not(.active){color:var(--primary);}
+
+.card-list{display:flex;flex-direction:column;gap:11px;}
+.item-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-md);padding:18px 20px;
+  transition:border-color var(--transition-fast);
+}
+.item-card:hover{border-color:rgba(79,95,224,0.2);}
+.item-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;}
+.item-title{font-weight:800;font-size:14.5px;line-height:1.3;}
+.item-desc{color:var(--ink-soft);font-size:13.5px;line-height:1.55;margin:4px 0 12px;}
+
+/* Pills */
+.pill{
+  display:inline-flex;align-items:center;gap:4px;padding:3px 10px;
+  border-radius:5px;font-size:10px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;
+}
+.pill-green{background:var(--green-soft);color:var(--green);}
+.pill-amber{background:var(--amber-soft);color:var(--amber);}
+.pill-red{background:var(--red-soft);color:var(--red);}
+.pill-neutral{background:var(--surface-alt);color:var(--ink-soft);border:1px solid var(--border);}
+.pill-priority-P0{background:var(--red-soft);color:var(--red);}
+.pill-priority-P1{background:var(--amber-soft);color:var(--amber);}
+.pill-priority-P2{background:var(--primary-soft);color:var(--primary);}
+
+.meta-row{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0;font-size:12.5px;color:var(--ink-soft);}
+.meta-item b{color:var(--ink);font-weight:700;}
+
+/* Zone bar */
+.zonebar-wrap{margin:13px 0 5px;}
+.zonebar{position:relative;height:7px;border-radius:999px;overflow:hidden;display:flex;background:var(--surface-alt);}
+.zonebar div{height:100%;}
+.zonebar .z-green{background:var(--green);}
+.zonebar .z-amber{background:var(--amber);}
+.zonebar .z-red{background:var(--red);}
+.zonebar-marker{
+  position:absolute;top:-2px;width:2px;height:11px;border-radius:1px;background:var(--ink);
+  transform:translateX(-50%);
+}
+.zonebar-label{font-size:11px;color:var(--ink-soft);margin-top:5px;font-family:var(--font-mono);font-weight:600;}
+
+/* Stakeholder chain */
+.stakeholder-chain{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:10px;}
+.stakeholder-node{background:var(--primary-soft);color:var(--primary-dark);padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;}
+.stakeholder-arrow{color:var(--ink-faint);font-size:12px;}
+
+/* Inline edit controls */
+.inline-edit-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;}
+.inline-select,.inline-date{
+  padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);
+  font-size:12.5px;font-weight:700;background:var(--surface-alt);
+  transition:border-color var(--transition-fast);
+}
+.inline-select:focus,.inline-date:focus{border-color:var(--primary);outline:none;}
+
+.empty-state{
+  text-align:center;padding:52px 20px;color:var(--ink-faint);
+  background:var(--surface);border-radius:var(--radius-md);
+  border:1px dashed var(--border);font-size:13.5px;line-height:1.6;
+}
+.empty-state-icon{font-size:28px;display:block;margin-bottom:8px;}
+
+/* Toast */
+.save-toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--ink);color:#fff;padding:10px 20px;border-radius:999px;
+  font-size:13px;font-weight:700;z-index:200;box-shadow:var(--shadow-lg);
+  opacity:0;transition:opacity .2s, transform .2s;pointer-events:none;
+}
+.save-toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+
+/* Add button dropdown */
+.add-btn-wrap{position:relative;}
+
+/* ============================================================
+   Team management (admin)
+   ============================================================ */
+.mgmt-table-wrap{background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);overflow:hidden;}
+
+/* ============================================================
+   Weekly summary
+   ============================================================ */
+.week-summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:20px;}
+.week-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;}
+.week-stat-num{font-family:var(--font-mono);font-size:22px;font-weight:600;color:var(--ink);}
+.week-stat-label{font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;margin-top:3px;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px 22px;}
+.chart-card h3{font-family:var(--font-display);font-size:15px;font-weight:600;margin:0 0 16px;color:var(--ink);}
+.bar-chart{display:flex;align-items:flex-end;gap:10px;height:120px;}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:5px;}
+.bar-track{width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center;}
+.bar-fill{width:60%;background:var(--primary);border-radius:3px 3px 0 0;min-height:2px;transition:height .4s cubic-bezier(.34,1.3,.64,1);}
+.bar-day-label{font-size:10px;color:var(--ink-soft);font-weight:700;}
+.bar-value{font-family:var(--font-mono);font-size:10px;color:var(--ink-faint);}
+
+/* Daily check-in */
+.checkin-row{
+  display:flex;align-items:center;gap:8px;margin-top:12px;
+  padding-top:12px;border-top:1px solid var(--border);
+}
+.checkin-row input[type=checkbox]{width:15px;height:15px;accent-color:var(--primary);cursor:pointer;flex-shrink:0;}
+.checkin-label{font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;user-select:none;}
+.checkin-row.logged .checkin-label{color:var(--green);}
+.checkin-note{font-size:12px;color:var(--ink-faint);margin-top:3px;font-style:italic;padding-left:23px;}
+
+/* Collapsible */
+.collapsible{border:1px solid var(--border);border-radius:var(--radius-sm);margin-top:8px;overflow:hidden;}
+.collapsible-head{padding:10px 14px;background:var(--surface-alt);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;}
+.collapsible-body{padding:12px 14px;font-size:13px;}
+
+/* Role/status badges */
+.role-badge{font-size:10px;font-weight:800;padding:3px 9px;border-radius:999px;text-transform:uppercase;}
+.role-Admin{background:var(--warm-soft);color:var(--warm-dark);}
+.role-User{background:var(--surface-alt);color:var(--ink-soft);}
+.status-Active{color:var(--green);font-weight:700;}
+.status-Inactive{color:var(--ink-faint);font-weight:700;}
+
+/* Loading skeleton */
+.skeleton{background:linear-gradient(90deg,var(--surface-alt) 25%,var(--border) 50%,var(--surface-alt) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius-sm);}
+@keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width:640px){
+  .stat-row{grid-template-columns:repeat(2,1fr);}
+  .week-summary-row{grid-template-columns:repeat(2,1fr);}
+  .container{padding:14px;}
+  .search-wrap{display:none;}
+  .topbar{padding:11px 16px;}
+  .tab-row{width:100%;border-radius:var(--radius-md);}
+  .workspace-header{padding:14px 16px;}
+  .add-btn-wrap{width:100%;}
+  .add-btn-wrap .btn-primary{width:100%;}
+  .greeting-banner{padding:20px 18px;}
+  .modal{border-radius:var(--radius-md);}
+  .inline-edit-row{gap:6px;}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============================================================
+       AUTH SCREEN
+       ============================================================ -->
+  <div id="authScreen">
+    <div class="blob" style="width:440px;height:440px;background:var(--warm);top:-160px;left:-130px;animation-delay:0s;"></div>
+    <div class="blob" style="width:380px;height:380px;background:var(--primary);bottom:-160px;right:-110px;animation-delay:-7s;"></div>
+
+    <div class="auth-card">
+      <p class="auth-wordmark">
+        <svg class="cumin-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <path class="stem" d="M 50 88 Q 46 65 52 50 Q 58 35 50 16"/>
+          <g transform="rotate(130 73 71)"><ellipse class="seed" cx="73" cy="71" rx="8" ry="3.6" fill="#8B6A2E" style="--sx:18px;--sy:15px;--bx:-7px;--by:17px;animation-delay:0ms"/></g>
+          <g transform="rotate(177.5 51 82)"><ellipse class="seed" cx="51" cy="82" rx="8" ry="3.6" fill="#A67C3B" style="--sx:1px;--sy:24px;--bx:7px;--by:6px;animation-delay:70ms"/></g>
+          <g transform="rotate(225 29 73)"><ellipse class="seed" cx="29" cy="73" rx="8" ry="3.6" fill="#6B4F23" style="--sx:-17px;--sy:17px;--bx:13px;--by:15px;animation-delay:140ms"/></g>
+          <g transform="rotate(272.5 20 51)"><ellipse class="seed" cx="20" cy="51" rx="8" ry="3.6" fill="#B98D47" style="--sx:-24px;--sy:-1px;--bx:14px;--by:37px;animation-delay:210ms"/></g>
+          <g transform="rotate(320 31 29)"><ellipse class="seed" cx="31" cy="29" rx="8" ry="3.6" fill="#7A5A28" style="--sx:-15px;--sy:-18px;--bx:19px;--by:59px;animation-delay:280ms"/></g>
+          <g transform="rotate(-50 36 63)"><ellipse class="leaf" cx="36" cy="63" rx="8" ry="3.6" fill="#2FAE6B" style="animation-delay:1.35s"/></g>
+          <g transform="rotate(40 66 45)"><ellipse class="leaf" cx="66" cy="45" rx="8" ry="3.6" fill="#1D9E75" style="animation-delay:1.5s"/></g>
+          <g transform="rotate(-35 38 29)"><ellipse class="leaf" cx="38" cy="29" rx="7" ry="3.2" fill="#6FCF6F" style="animation-delay:1.65s"/></g>
+          <circle class="pod" cx="50" cy="14" r="5" fill="#C98A2E" style="animation-delay:1.7s"/>
+          <circle class="pod" cx="40" cy="20" r="4" fill="#E0A83E" style="animation-delay:1.82s"/>
+          <circle class="pod" cx="60" cy="20" r="4" fill="#D8724A" style="animation-delay:1.94s"/>
+        </svg>
+        Cumin
+      </p>
+      <p class="auth-sub" id="authSubtitle">One place for everyone's best work.</p>
+
+      <div id="authError" class="error-msg hidden"></div>
+      <div id="authSuccess" class="success-msg hidden"></div>
+
+      <div id="loginForm">
+        <div class="field">
+          <label>Work Email</label>
+          <input type="email" id="loginEmail" placeholder="you@company.com" autocomplete="email">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <div class="password-wrap">
+            <input type="password" id="loginPassword" placeholder="6-digit password" autocomplete="current-password"
+              onkeydown="if(event.key==='Enter')doLogin()">
+            <button type="button" class="password-eye" onclick="togglePasswordVisibility('loginPassword',this)" aria-label="Show password">👁</button>
+          </div>
+        </div>
+        <button class="btn btn-warm btn-block" onclick="doLogin()" id="loginBtn">Log in</button>
+        <div style="text-align:center;margin-top:16px;">
+          <button class="link-btn" onclick="showForgot()">Forgot password?</button>
+        </div>
+      </div>
+
+      <div id="forgotForm" class="hidden">
+        <div class="field">
+          <label>Work Email</label>
+          <input type="email" id="forgotEmail" placeholder="you@company.com" autocomplete="email"
+            onkeydown="if(event.key==='Enter')doForgotPassword()">
+        </div>
+        <button class="btn btn-warm btn-block" onclick="doForgotPassword()">Send new password</button>
+        <div style="text-align:center;margin-top:16px;">
+          <button class="link-btn" onclick="showLogin()">← Back to login</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MAIN APP
+       ============================================================ -->
+  <div id="mainApp" class="hidden">
+    <div class="topbar">
+      <div class="wordmark">
+        <svg class="cumin-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <path class="stem" d="M 50 88 Q 46 65 52 50 Q 58 35 50 16"/>
+          <g transform="rotate(130 73 71)"><ellipse class="seed" cx="73" cy="71" rx="8" ry="3.6" fill="#8B6A2E" style="--sx:18px;--sy:15px;--bx:-7px;--by:17px;animation-delay:0ms"/></g>
+          <g transform="rotate(177.5 51 82)"><ellipse class="seed" cx="51" cy="82" rx="8" ry="3.6" fill="#A67C3B" style="--sx:1px;--sy:24px;--bx:7px;--by:6px;animation-delay:70ms"/></g>
+          <g transform="rotate(225 29 73)"><ellipse class="seed" cx="29" cy="73" rx="8" ry="3.6" fill="#6B4F23" style="--sx:-17px;--sy:17px;--bx:13px;--by:15px;animation-delay:140ms"/></g>
+          <g transform="rotate(272.5 20 51)"><ellipse class="seed" cx="20" cy="51" rx="8" ry="3.6" fill="#B98D47" style="--sx:-24px;--sy:-1px;--bx:14px;--by:37px;animation-delay:210ms"/></g>
+          <g transform="rotate(320 31 29)"><ellipse class="seed" cx="31" cy="29" rx="8" ry="3.6" fill="#7A5A28" style="--sx:-15px;--sy:-18px;--bx:19px;--by:59px;animation-delay:280ms"/></g>
+          <g transform="rotate(-50 36 63)"><ellipse class="leaf" cx="36" cy="63" rx="8" ry="3.6" fill="#2FAE6B" style="animation-delay:1.35s"/></g>
+          <g transform="rotate(40 66 45)"><ellipse class="leaf" cx="66" cy="45" rx="8" ry="3.6" fill="#1D9E75" style="animation-delay:1.5s"/></g>
+          <g transform="rotate(-35 38 29)"><ellipse class="leaf" cx="38" cy="29" rx="7" ry="3.2" fill="#6FCF6F" style="animation-delay:1.65s"/></g>
+          <circle class="pod" cx="50" cy="14" r="5" fill="#C98A2E" style="animation-delay:1.7s"/>
+          <circle class="pod" cx="40" cy="20" r="4" fill="#E0A83E" style="animation-delay:1.82s"/>
+          <circle class="pod" cx="60" cy="20" r="4" fill="#D8724A" style="animation-delay:1.94s"/>
+        </svg>
+        Cumin
+      </div>
+      <div class="topbar-spacer"></div>
+
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="searchInput" placeholder="Search projects, people, ideas…"
+          oninput="onSearchInput()" autocomplete="off">
+        <div id="searchResults" class="search-results hidden"></div>
+      </div>
+
+      <div style="position:relative;">
+        <button class="icon-btn" onclick="toggleNotifDropdown()" aria-label="Notifications">
+          🔔<span id="notifBadge" class="badge hidden">0</span>
+        </button>
+        <div id="notifDropdown" class="notif-dropdown hidden"></div>
+      </div>
+
+      <div class="user-menu-wrap">
+        <button class="icon-btn" onclick="toggleUserMenu()" aria-label="User menu">
+          <span id="topbarAvatar">🙂</span>
+        </button>
+        <div id="userMenu" class="user-menu hidden">
+          <button onclick="goHome()">🏠 Home</button>
+          <button id="teamMgmtMenuBtn" class="hidden" onclick="openTeamManagement()">👑 Team Management</button>
+          <button onclick="showResetOwnPassword()">🔑 Reset my password</button>
+          <button onclick="doLogout()">🚪 Log out</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" id="mainContainer">
+      <!-- Views render here -->
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="save-toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   CONFIG — Updated API URL (new deployment)
+   ============================================================ */
+const API_URL = 'https://script.google.com/macros/s/AKfycbyK9GDEF_z9xcGEDNyRmlEidme4mNZ9GKfQR7XfsFpiBSD28GWvoSDjgNZlrF460x4/exec';
+
+const PROJECT_STATUSES = ['Open', 'In Progress', 'On Hold', 'Delayed', 'Completed'];
+const IDEA_TYPES = ['Visibility', 'Cost', 'Process Improvement', 'CX'];
+const PRIORITIES = ['P0', 'P1', 'P2'];
+const UPDATE_TYPES = ['Update Progress', 'Update Delay', 'Update Deprioritization'];
+
+const AVATAR_COLORS = {
+  '🦊':'#FF8A4C','🐼':'#5B6B79','🐸':'#2FAE6B','🐯':'#FFA53E','🐨':'#8E9AAF',
+  '🐙':'#8E5CD9','🦄':'#F06BB0','🐻':'#8B5E3C','🐱':'#FF7A6B','🐰':'#FF9AC8',
+  '🦋':'#5A8DEE','🐥':'#FFD23F'
+};
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let state = {
+  token: localStorage.getItem('cumin_token') || null,
+  user: JSON.parse(localStorage.getItem('cumin_user') || 'null'),
+  homeFilter: 'All',
+  currentWorkspaceUserId: null,
+  currentWorkspaceTab: 'projects',
+  workspaceData: null,
+  searchDebounce: null,
+  currentProjectLogId: null
+};
+
+/* ============================================================
+   API HELPER
+   text/plain avoids CORS preflight on Apps Script
+   ============================================================ */
+async function apiCall(action, payload = {}) {
+  payload.action = action;
+  if (state.token) payload.token = state.token;
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) return { ok: false, error: `Server error (${res.status})` };
+    return await res.json();
+  } catch (err) {
+    return { ok: false, error: 'Network error — check your connection.' };
+  }
+}
+
+/* Toast */
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ============================================================
+   AUTH
+   ============================================================ */
+function showLogin() {
+  document.getElementById('loginForm').classList.remove('hidden');
+  document.getElementById('forgotForm').classList.add('hidden');
+  document.getElementById('authSubtitle').textContent = "One place for everyone's best work.";
+  hideAuthMsgs();
+}
+function showForgot() {
+  document.getElementById('loginForm').classList.add('hidden');
+  document.getElementById('forgotForm').classList.remove('hidden');
+  document.getElementById('authSubtitle').textContent = "We'll send a new password to your email.";
+  hideAuthMsgs();
+}
+function hideAuthMsgs() {
+  document.getElementById('authError').classList.add('hidden');
+  document.getElementById('authSuccess').classList.add('hidden');
+}
+function authError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg; el.classList.remove('hidden');
+  document.getElementById('authSuccess').classList.add('hidden');
+}
+function authSuccess(msg) {
+  const el = document.getElementById('authSuccess');
+  el.textContent = msg; el.classList.remove('hidden');
+  document.getElementById('authError').classList.add('hidden');
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
+  if (!email || !password) return authError('Enter your email and password.');
+  const btn = document.getElementById('loginBtn');
+  btn.textContent = 'Logging in…'; btn.disabled = true;
+  const res = await apiCall('login', { email, password });
+  btn.textContent = 'Log in'; btn.disabled = false;
+  if (!res.ok) return authError(res.error || 'Login failed.');
+  // Migrate from old storage key if present
+  localStorage.removeItem('townhall_token');
+  localStorage.removeItem('townhall_user');
+  state.token = res.data.token;
+  state.user = res.data.user;
+  localStorage.setItem('cumin_token', state.token);
+  localStorage.setItem('cumin_user', JSON.stringify(state.user));
+  enterApp();
+}
+
+async function doForgotPassword() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  if (!email) return authError('Enter your email.');
+  const res = await apiCall('forgotPassword', { email });
+  if (!res.ok) return authError(res.error || 'Something went wrong.');
+  authSuccess(res.data.message);
+}
+
+async function doLogout() {
+  await apiCall('logout', {});
+  localStorage.removeItem('cumin_token');
+  localStorage.removeItem('cumin_user');
+  // Also clear old keys just in case
+  localStorage.removeItem('townhall_token');
+  localStorage.removeItem('townhall_user');
+  state = { ...state, token: null, user: null, workspaceData: null };
+  document.getElementById('mainApp').classList.add('hidden');
+  document.getElementById('authScreen').classList.remove('hidden');
+  showLogin();
+}
+
+function showResetOwnPassword() {
+  closeDropdowns();
+  if (!confirm(`Send a new password to ${state.user.email}?`)) return;
+  apiCall('forgotPassword', { email: state.user.email }).then(res => {
+    showToast(res.ok ? '✓ New password sent to your email.' : `⚠️ ${res.error || 'Something went wrong.'}`);
+  });
+}
+
+async function enterApp() {
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('mainApp').classList.remove('hidden');
+  document.getElementById('topbarAvatar').textContent = state.user.avatar;
+  if (state.user.role === 'Admin') {
+    document.getElementById('teamMgmtMenuBtn').classList.remove('hidden');
+  }
+
+  state.currentWorkspaceUserId = null;
+  renderLoading();
+
+  const res = await apiCall('getHomeBundle', {});
+  // New code.gs returns: { ok: true, data: { home, summary, notifications } }
+  // where home/summary/notifications are plain objects (not wrapped in ok/data)
+  if (!res.ok || !res.data || !res.data.home) {
+    renderError(res.error || 'Could not load homepage.');
+    return;
+  }
+
+  homeDataCache = res.data.home;
+  homeSummaryCache = res.data.summary;
+
+  const notif = res.data.notifications;
+  if (notif) {
+    notifCache = notif.alerts || [];
+    const badge = document.getElementById('notifBadge');
+    if (notif.count > 0) { badge.textContent = notif.count; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+    if (state.user.role === 'Admin') showDefaulterPopupIfNeeded(notif.alerts);
+  }
+
+  renderHome(res.data.home, res.data.summary);
+}
+
+// Try auto-login from stored session
+if (state.token && state.user) {
+  // Also check old storage key and migrate
+  const oldToken = localStorage.getItem('townhall_token');
+  const oldUser = localStorage.getItem('townhall_user');
+  if (oldToken && !state.token) {
+    state.token = oldToken;
+    state.user = JSON.parse(oldUser || 'null');
+    localStorage.setItem('cumin_token', state.token);
+    localStorage.setItem('cumin_user', JSON.stringify(state.user));
+    localStorage.removeItem('townhall_token');
+    localStorage.removeItem('townhall_user');
+  }
+  enterApp();
+}
+
+/* ============================================================
+   TOP BAR: helpers, notifications, search
+   ============================================================ */
+function closeDropdowns() {
+  document.getElementById('userMenu').classList.add('hidden');
+  document.getElementById('notifDropdown').classList.add('hidden');
+  const sr = document.getElementById('searchResults');
+  if (sr) sr.classList.add('hidden');
+  const dd = document.getElementById('addPickerDropdown');
+  if (dd) dd.classList.add('hidden');
+}
+
+function toggleUserMenu() {
+  document.getElementById('userMenu').classList.toggle('hidden');
+  document.getElementById('notifDropdown').classList.add('hidden');
+}
+
+let notifCache = [];
+async function toggleNotifDropdown() {
+  const el = document.getElementById('notifDropdown');
+  document.getElementById('userMenu').classList.add('hidden');
+  if (!el.classList.contains('hidden')) { el.classList.add('hidden'); return; }
+  renderNotifDropdown(); // show cached instantly
+  el.classList.remove('hidden');
+  // Quietly refresh in background
+  const res = await apiCall('getNotifications', {});
+  if (res.ok && res.data) {
+    notifCache = res.data.alerts || [];
+    const badge = document.getElementById('notifBadge');
+    if (res.data.count > 0) { badge.textContent = res.data.count; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+    renderNotifDropdown();
+  }
+}
+
+function renderNotifDropdown() {
+  const el = document.getElementById('notifDropdown');
+  const colorFor = { overdue: 'var(--red)', dueToday: 'var(--amber)', dueTomorrow: '#FFD23F' };
+  let html = '<div class="notif-header">Deadline Alerts</div>';
+  if (!notifCache || notifCache.length === 0) {
+    html += '<div class="notif-empty">✨ Nothing overdue. Clear skies.</div>';
+  } else {
+    notifCache.forEach(n => {
+      html += `<div class="notif-item" onclick="openWorkspace('${escapeAttr(n.userId||'')}');closeDropdowns()">
+        <span class="notif-dot" style="background:${colorFor[n.level]||'var(--ink-faint)'}"></span>
+        <span>${escapeHtml(n.avatar||'')} ${escapeHtml(n.message)}</span>
+      </div>`;
+    });
+  }
+  el.innerHTML = html;
+}
+
+function showDefaulterPopupIfNeeded(alerts) {
+  if (!alerts) return;
+  const overdue = alerts.filter(a => a.level === 'overdue');
+  if (overdue.length === 0) return;
+  const list = overdue.map(o =>
+    `<li style="margin-bottom:7px;"><b>${escapeHtml(o.ownerName)}</b> — ${escapeHtml(o.projectName)}</li>`
+  ).join('');
+  openModal(`
+    <div class="modal-header">
+      <h2>⚠️ Deadline Report</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--ink-soft);font-size:13.5px;line-height:1.6;">
+        The following team member${overdue.length>1?'s have':' has'} exceeded their committed ETD:
+      </p>
+      <ul style="font-size:13.5px;padding-left:20px;margin:0;">${list}</ul>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal()">Acknowledge</button>
+    </div>
+  `);
+}
+
+/* Search */
+function onSearchInput() {
+  clearTimeout(state.searchDebounce);
+  const q = document.getElementById('searchInput').value.trim();
+  if (!q) { document.getElementById('searchResults').classList.add('hidden'); return; }
+  state.searchDebounce = setTimeout(async () => {
+    const res = await apiCall('search', { query: q });
+    if (!res.ok || !res.data) return;
+    renderSearchResults(res.data.results || []);
+  }, 300);
+}
+function renderSearchResults(results) {
+  const el = document.getElementById('searchResults');
+  if (results.length === 0) {
+    el.innerHTML = '<div class="search-result-item" style="color:var(--ink-faint)">No results found.</div>';
+  } else {
+    el.innerHTML = results.map(r =>
+      `<div class="search-result-item" onclick="onSearchResultClick('${escapeAttr(r.userId||'')}')">
+        <div class="search-result-type">${escapeHtml(r.type)}</div>
+        <div>${escapeHtml(r.label)}</div>
+      </div>`
+    ).join('');
+  }
+  el.classList.remove('hidden');
+}
+function onSearchResultClick(userId) {
+  document.getElementById('searchResults').classList.add('hidden');
+  document.getElementById('searchInput').value = '';
+  if (userId) openWorkspace(userId);
+}
+
+/* Global click-away to close dropdowns */
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-wrap')) {
+    const sr = document.getElementById('searchResults');
+    if (sr) sr.classList.add('hidden');
+  }
+  if (!e.target.closest('.user-menu-wrap')) {
+    document.getElementById('userMenu').classList.add('hidden');
+  }
+  if (!e.target.closest('.icon-btn') && !e.target.closest('.notif-dropdown')) {
+    document.getElementById('notifDropdown').classList.add('hidden');
+  }
+  const dd = document.getElementById('addPickerDropdown');
+  if (dd && !e.target.closest('.add-btn-wrap')) dd.classList.add('hidden');
+});
+
+/* ============================================================
+   MODAL HELPERS
+   ============================================================ */
+function openModal(innerHtml) {
+  closeModal();
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.id = 'activeOverlay';
+  overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = innerHtml;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  // Focus first focusable element
+  setTimeout(() => { const f = modal.querySelector('input,select,textarea,button'); if (f) f.focus(); }, 50);
+}
+function closeModal() {
+  const el = document.getElementById('activeOverlay');
+  if (el) el.remove();
+}
+// ESC closes modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+
+/* ============================================================
+   HOME VIEW
+   ============================================================ */
+let homeDataCache = null;
+let homeSummaryCache = null;
+
+async function goHome() {
+  state.currentWorkspaceUserId = null;
+  closeDropdowns();
+  renderLoading();
+  const res = await apiCall('getHomeBundle', {});
+  if (!res.ok || !res.data || !res.data.home) {
+    renderError(res.error || 'Could not load homepage.');
+    return;
+  }
+  homeDataCache = res.data.home;
+  homeSummaryCache = res.data.summary;
+  const notif = res.data.notifications;
+  if (notif) {
+    notifCache = notif.alerts || [];
+    const badge = document.getElementById('notifBadge');
+    if (notif.count > 0) { badge.textContent = notif.count; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+  }
+  renderHome(res.data.home, res.data.summary);
+}
+
+function renderLoading() {
+  document.getElementById('mainContainer').innerHTML = `
+    <div style="padding:80px 20px;text-align:center;color:var(--ink-faint);">
+      <div style="font-size:28px;margin-bottom:12px;">🌱</div>
+      Loading Cumin…
+    </div>`;
+}
+function renderError(msg) {
+  document.getElementById('mainContainer').innerHTML =
+    `<div class="empty-state"><span class="empty-state-icon">⚠️</span>${escapeHtml(msg)}</div>`;
+}
+
+function greetingMessages() {
+  const hour = new Date().getHours();
+  const timeGreet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const flair = hour < 12 ? '🌻' : hour < 17 ? '☀️' : '🌙';
+  const lines = [
+    "Here's what's on your plate today.",
+    "Let's make today count.",
+    "Everything's on the board — go get it.",
+    "Good things are in motion.",
+    "One good day builds the next."
+  ];
+  return { timeGreet, flair, line: lines[new Date().getDate() % lines.length] };
+}
+
+function renderHome(data, summary) {
+  const g = greetingMessages();
+  const ps = data.personalSummary;
+
+  let filteredTeam = data.teamCards;
+  if (state.homeFilter !== 'All') {
+    filteredTeam = data.teamCards.filter(t => {
+      if (state.homeFilter === 'My Work') return t.userId === state.user.userId;
+      if (state.homeFilter === 'Ongoing') return t.ongoing > 0;
+      if (state.homeFilter === 'Completed') return t.completed > 0;
+      if (state.homeFilter === 'Delayed') return t.ongoing > 0;
+      return true;
+    });
+  }
+
+  const teamCardsHtml = filteredTeam.map(t => {
+    const color = AVATAR_COLORS[t.avatar] || 'var(--primary)';
+    return `
+    <div class="team-card" onclick="openWorkspace('${escapeAttr(t.userId)}')">
+      <div class="team-card-roof" style="background:${color}"></div>
+      <div class="team-card-body">
+        <div class="team-card-avatar">${t.avatar}</div>
+        <div class="team-card-name">${escapeHtml(t.name)}</div>
+        <div class="team-card-stats">
+          <div class="tcs-item"><div class="tcs-num" style="color:var(--green)">${t.active}</div><div class="tcs-label">Active</div></div>
+          <div class="tcs-item"><div class="tcs-num" style="color:var(--amber)">${t.ongoing}</div><div class="tcs-label">Ongoing</div></div>
+          <div class="tcs-item"><div class="tcs-num" style="color:var(--primary)">${t.completed}</div><div class="tcs-label">Done</div></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  let summaryHtml = '';
+  if (summary) {
+    const rows = summary.rows.map(r => `
+      <tr>
+        <td class="name-cell">${r.avatar} ${escapeHtml(r.name)}</td>
+        <td>${r.newCount}</td><td>${r.inProgress}</td><td>${r.completed}</td>
+        <td>${r.ideas}</td><td>${r.adhoc}</td>
+        <td style="color:${r.delayed>0?'var(--red)':'inherit'}">${r.delayed}</td>
+      </tr>`).join('');
+    summaryHtml = `
+      <div class="section-title" style="margin-top:30px;">📊 Today at Cumin</div>
+      <div class="summary-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Team Member</th><th>New</th><th>In Progress</th>
+              <th>Completed</th><th>Ideas</th><th>Ad-hoc</th><th>Delayed</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+            <tr class="total-row">
+              <td>Total</td>
+              <td>${summary.totals.newCount}</td><td>${summary.totals.inProgress}</td>
+              <td>${summary.totals.completed}</td><td>${summary.totals.ideas}</td>
+              <td>${summary.totals.adhoc}</td><td>${summary.totals.delayed}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  document.getElementById('mainContainer').innerHTML = `
+    <div class="greeting-banner">
+      <h1>${g.timeGreet}, ${escapeHtml(data.greetingName)} ${g.flair}</h1>
+      <p>${g.line}</p>
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-num">${ps.active}</div><div class="stat-label">Active Projects</div></div>
+        <div class="stat-card"><div class="stat-num">${ps.completed}</div><div class="stat-label">Completed</div></div>
+        <div class="stat-card"><div class="stat-num">${ps.ideas}</div><div class="stat-label">Ideas</div></div>
+        <div class="stat-card"><div class="stat-num">${ps.adhocTimeToday}</div><div class="stat-label">Ad-hoc Today</div></div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      👥 Your Team
+      <span class="count">${filteredTeam.length} of ${data.teamCards.length}</span>
+    </div>
+    <div class="chip-row">
+      ${['All','My Work','Ongoing','Completed','Delayed'].map(f =>
+        `<button class="chip ${state.homeFilter===f?'active':''}" onclick="setHomeFilter('${f}')">${f}</button>`
+      ).join('')}
+    </div>
+    <div class="team-grid">
+      ${teamCardsHtml || '<div class="empty-state"><span class="empty-state-icon">🔍</span>No one matches this filter — try another.</div>'}
+    </div>
+    ${summaryHtml}
+  `;
+}
+
+function setHomeFilter(f) {
+  state.homeFilter = f;
+  if (homeDataCache) renderHome(homeDataCache, homeSummaryCache);
+}
+
+/* ============================================================
+   WORKSPACE VIEW
+   ============================================================ */
+async function openWorkspace(userId) {
+  if (!userId) return;
+  closeDropdowns();
+  state.currentWorkspaceUserId = userId;
+  state.currentWorkspaceTab = 'projects';
+  renderLoading();
+  const res = await apiCall('getUserWorkspace', { userId });
+  if (!res.ok) { renderError(res.error); return; }
+  state.workspaceData = res.data;
+  renderWorkspace();
+}
+
+function renderWorkspace() {
+  const d = state.workspaceData;
+  const color = AVATAR_COLORS[d.user.avatar] || 'var(--primary)';
+  const isMine = d.user.userId === state.user.userId;
+
+  const tabs = [
+    { id: 'projects', label: `Projects (${d.projects.length})` },
+    { id: 'ideas', label: `Ideas (${d.ideas.length})` },
+  ];
+  if (d.isSelfOrAdmin) {
+    tabs.push({ id: 'week', label: '📊 This Week' });
+    tabs.push({ id: 'adhoc', label: `Ad-hoc (${d.adhoc.length})` });
+    tabs.push({ id: 'history', label: 'History' });
+  }
+
+  document.getElementById('mainContainer').innerHTML = `
+    <button class="back-link" onclick="goHome()">← Back to Cumin</button>
+    <div class="workspace-header">
+      <div class="ws-avatar">${d.user.avatar}</div>
+      <div>
+        <p class="ws-name">${escapeHtml(d.user.name)}'s Workspace</p>
+        <p class="ws-meta">${escapeHtml(d.user.email)}${isMine ? ' · This is you' : ''}</p>
+      </div>
+      <div class="ws-spacer"></div>
+      ${isMine ? `
+        <div class="add-btn-wrap">
+          <button class="btn btn-primary" onclick="toggleAddPicker()">+ Add</button>
+          <div id="addPickerDropdown" class="hidden" style="position:absolute;top:calc(100% + 8px);right:0;z-index:50;width:265px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:10px;">
+            <div class="type-picker">
+              <button onclick="openProjectModal()">
+                <span class="tp-icon">📁</span>
+                <span>Project<span class="tp-sub">A formal piece of work with an ETD</span></span>
+              </button>
+              <button onclick="openIdeaModal()">
+                <span class="tp-icon">💡</span>
+                <span>Idea<span class="tp-sub">Something worth exploring later</span></span>
+              </button>
+              <button onclick="openAdhocModal()">
+                <span class="tp-icon">⚡</span>
+                <span>Ad-hoc<span class="tp-sub">Unplanned work you did today</span></span>
+              </button>
+            </div>
+          </div>
+        </div>` : ''}
+    </div>
+
+    <div class="tab-row">
+      ${tabs.map(t =>
+        `<button class="tab-btn ${state.currentWorkspaceTab===t.id?'active':''}" onclick="setWorkspaceTab('${t.id}')">${t.label}</button>`
+      ).join('')}
+    </div>
+
+    <div id="workspaceTabContent"></div>
+  `;
+  renderWorkspaceTabContent();
+}
+
+function toggleAddPicker() {
+  const dd = document.getElementById('addPickerDropdown');
+  if (dd) dd.classList.toggle('hidden');
+}
+
+function setWorkspaceTab(tab) {
+  state.currentWorkspaceTab = tab;
+  renderWorkspace();
+}
+
+function renderWorkspaceTabContent() {
+  const d = state.workspaceData;
+  const isMine = d.user.userId === state.user.userId;
+  const canEdit = isMine || state.user.role === 'Admin';
+  const el = document.getElementById('workspaceTabContent');
+
+  if (state.currentWorkspaceTab === 'projects') {
+    el.innerHTML = d.projects.length === 0
+      ? '<div class="empty-state"><span class="empty-state-icon">📁</span>Nothing here yet — click + Add to start your first project.</div>'
+      : `<div class="card-list">${d.projects.map(p => renderProjectCard(p, canEdit)).join('')}</div>`;
+  } else if (state.currentWorkspaceTab === 'ideas') {
+    el.innerHTML = d.ideas.length === 0
+      ? '<div class="empty-state"><span class="empty-state-icon">💡</span>No ideas logged yet — every good project starts with one.</div>'
+      : `<div class="card-list">${d.ideas.map(i => renderIdeaCard(i, canEdit)).join('')}</div>`;
+  } else if (state.currentWorkspaceTab === 'adhoc') {
+    el.innerHTML = d.adhoc.length === 0
+      ? '<div class="empty-state"><span class="empty-state-icon">⚡</span>Nothing logged yet — you\'re all caught up.</div>'
+      : `<div class="card-list">${d.adhoc.map(a => renderAdhocCard(a, canEdit)).join('')}</div>`;
+  } else if (state.currentWorkspaceTab === 'history') {
+    el.innerHTML = d.activityHistory.length === 0
+      ? '<div class="empty-state"><span class="empty-state-icon">📜</span>No activity yet — this fills in as work happens.</div>'
+      : `<div class="card-list">${d.activityHistory.map(renderHistoryItem).join('')}</div>`;
+  } else if (state.currentWorkspaceTab === 'week') {
+    renderWeekTab(d.user.userId);
+  }
+}
+
+async function renderWeekTab(userId) {
+  const el = document.getElementById('workspaceTabContent');
+  el.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--ink-faint);">Loading weekly summary…</div>`;
+  const res = await apiCall('getWeeklySummary', { userId });
+  if (!res.ok || !res.data) {
+    el.innerHTML = `<div class="empty-state">⚠️ ${escapeHtml(res.error || 'Could not load.')}</div>`;
+    return;
+  }
+  const { days, totals } = res.data;
+  const maxCheckIns = Math.max(1, ...days.map(d => d.checkIns));
+  const maxHours = Math.max(1, ...days.map(d => d.adhocHours));
+
+  el.innerHTML = `
+    <div class="week-summary-row">
+      <div class="week-stat"><div class="week-stat-num">${totals.projectsTouched}</div><div class="week-stat-label">Projects Touched</div></div>
+      <div class="week-stat"><div class="week-stat-num">${totals.totalHours}h</div><div class="week-stat-label">Hours Logged</div></div>
+      <div class="week-stat"><div class="week-stat-num">${totals.ideasAdded}</div><div class="week-stat-label">Ideas Added</div></div>
+      <div class="week-stat"><div class="week-stat-num">${totals.completed}</div><div class="week-stat-label">Completed</div></div>
+    </div>
+    <div class="chart-card" style="margin-bottom:14px;">
+      <h3>Daily check-ins</h3>
+      <div class="bar-chart">
+        ${days.map(d => `
+          <div class="bar-col">
+            <div class="bar-value">${d.checkIns || ''}</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="height:${d.checkIns===0?2:(d.checkIns/maxCheckIns*100)}%"></div>
+            </div>
+            <div class="bar-day-label">${d.label}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Ad-hoc hours logged</h3>
+      <div class="bar-chart">
+        ${days.map(d => `
+          <div class="bar-col">
+            <div class="bar-value">${d.adhocHours || ''}</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="height:${d.adhocHours===0?2:(d.adhocHours/maxHours*100)}%;background:var(--warm)"></div>
+            </div>
+            <div class="bar-day-label">${d.label}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   PROJECT CARD RENDERING
+   ============================================================ */
+function zoneColor(zone) {
+  return zone === 'green' ? 'var(--green)' : zone === 'amber' ? 'var(--amber)' : 'var(--red)';
+}
+function pillClassForDisplayStatus(status) {
+  if (status === 'Completed') return 'pill-green';
+  if (status === 'Delayed') return 'pill-red';
+  if (status === 'On Hold') return 'pill-amber';
+  return 'pill-neutral';
+}
+
+function renderZoneBar(p) {
+  if (p.status === 'Completed') {
+    return `<div class="zonebar-wrap">
+      <div class="zonebar"><div class="z-green" style="width:100%"></div></div>
+      <div class="zonebar-label">${escapeHtml(p.completionVariance || 'Completed')}</div>
+    </div>`;
+  }
+  // Guard against null daysRemaining (new backend fix for missing ETA)
+  if (p.daysRemaining === null || p.daysRemaining === undefined) {
+    return `<div class="zonebar-wrap">
+      <div class="zonebar"><div class="z-amber" style="width:100%;opacity:.4"></div></div>
+      <div class="zonebar-label">No deadline set</div>
+    </div>`;
+  }
+  const markerPos = p.zone === 'green' ? 20 : p.zone === 'amber' ? 55 : 90;
+  const label = p.displayStatus === 'Delayed'
+    ? (p.daysRemaining < 0
+        ? `${Math.abs(p.daysRemaining)} day(s) overdue`
+        : `⚠️ Flagged at risk — ${p.daysRemaining} day(s) left`)
+    : `${p.daysRemaining} day(s) remaining`;
+  return `<div class="zonebar-wrap">
+    <div class="zonebar" style="position:relative;">
+      <div class="z-green" style="width:33.3%"></div>
+      <div class="z-amber" style="width:33.3%"></div>
+      <div class="z-red" style="width:33.4%"></div>
+      <div class="zonebar-marker" style="left:${markerPos}%;background:${zoneColor(p.zone)}"></div>
+    </div>
+    <div class="zonebar-label" style="color:${zoneColor(p.zone)}">${label}</div>
+  </div>`;
+}
+
+function renderStakeholders(str) {
+  if (!str) return '';
+  const parts = String(str).split('→').map(s => s.trim()).filter(Boolean);
+  if (parts.length === 0) return '';
+  return `<div class="stakeholder-chain">
+    ${parts.map((s, i) =>
+      (i > 0 ? '<span class="stakeholder-arrow">→</span>' : '') +
+      `<span class="stakeholder-node">${escapeHtml(s)}</span>`
+    ).join('')}
+  </div>`;
+}
+
+function renderProjectCard(p, canEdit) {
+  const isAdmin = state.user.role === 'Admin';
+  const editControls = canEdit ? `
+    <div class="inline-edit-row">
+      <select class="inline-select" onchange="updateProjectField('${p.projectId}','status',this.value)">
+        ${PROJECT_STATUSES.map(s =>
+          `<option value="${s}" ${p.status===s?'selected':''}>${
+            s==='Open' ? 'Open / To Be Picked' :
+            s==='Delayed' ? 'Delayed (at risk)' : s
+          }</option>`
+        ).join('')}
+      </select>
+      ${isAdmin
+        ? `<input type="date" class="inline-date" value="${formatDateInput(p.eta)}" onchange="updateProjectField('${p.projectId}','eta',this.value)">`
+        : `<span class="pill pill-neutral" title="Only Admin can change the deadline">🔒 ETD: ${formatDateDisplay(p.eta)}</span>`}
+      ${p.status==='Completed' ? `<span class="pill pill-green" title="Auto-filled on completion">✓ Done ${formatDateDisplay(p.actualCompletionDate)}</span>` : ''}
+      <button class="btn btn-ghost btn-sm" onclick="openEditProjectModal('${p.projectId}')">Edit details</button>
+    </div>` : '';
+
+  return `<div class="item-card">
+    <div class="item-card-top">
+      <div>
+        <div class="item-title"
+          ${canEdit ? `onclick="openProjectLogPage('${p.projectId}')" style="cursor:pointer;text-decoration:underline;text-decoration-color:transparent;transition:text-decoration-color .15s;" onmouseover="this.style.textDecorationColor='var(--ink-faint)'" onmouseout="this.style.textDecorationColor='transparent'"` : ''}>
+          ${escapeHtml(p.projectName)}
+        </div>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0;">
+        <span class="pill ${pillClassForDisplayStatus(p.displayStatus)}">${p.displayStatus}</span>
+        <span class="pill pill-priority-${p.priority}">${p.priority}</span>
+      </div>
+    </div>
+    <div class="item-desc">${escapeHtml(p.description || '')}</div>
+    ${renderZoneBar(p)}
+    <div class="meta-row">
+      <div class="meta-item">ETD: <b>${formatDateDisplay(p.eta)}</b></div>
+      ${p.impact ? `<div class="meta-item">Scope: <b>${escapeHtml(p.impact)}</b></div>` : ''}
+      ${p.dependency ? `<div class="meta-item">Dependency: <b>${escapeHtml(p.dependency)}</b></div>` : ''}
+    </div>
+    ${renderStakeholders(p.stakeholders)}
+    ${editControls}
+    ${canEdit ? renderCheckinRow(p) : ''}
+  </div>`;
+}
+
+function openEditProjectModal(projectId) {
+  const p = state.workspaceData.projects.find(x => x.projectId === projectId);
+  if (!p) return;
+  const isAdmin = state.user.role === 'Admin';
+  openModal(`
+    <div class="modal-header">
+      <h2>Edit Project Details</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Project Name</label><input id="epName" value="${escapeAttr(p.projectName)}"></div>
+      <div class="field"><label>Objective *</label><textarea id="epDesc" required>${escapeHtml(p.description || '')}</textarea></div>
+      <div class="field"><label>Scope *</label><input id="epImpact" value="${escapeAttr(p.impact || '')}" required></div>
+      <div class="field"><label>Priority</label>
+        <select id="epPriority">${PRIORITIES.map(pr => `<option value="${pr}" ${p.priority===pr?'selected':''}>${pr}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Dependency</label><input id="epDependency" value="${escapeAttr(p.dependency || '')}"></div>
+      <div class="field"><label>Stakeholders</label><input id="epStakeholders" value="${escapeAttr(p.stakeholders || '')}" placeholder="e.g. Ops team, Finance (optional)"></div>
+      ${p.status === 'Completed' ? `
+      <div class="field">
+        <label>Actual Completion Date</label>
+        <input type="date" id="epCompletionDate" value="${formatDateInput(p.actualCompletionDate)}">
+        <p style="font-size:12px;color:var(--ink-faint);margin-top:5px;">Auto-filled when marked Completed — only change if it needs correcting.</p>
+      </div>` : ''}
+      <div class="field">
+        <label>ETD (Deadline)</label>
+        ${isAdmin
+          ? `<input type="date" id="epEta" value="${formatDateInput(p.eta)}">`
+          : `<input value="${formatDateDisplay(p.eta)}" disabled style="opacity:.55;cursor:not-allowed;">
+             <p style="font-size:12px;color:var(--ink-faint);margin-top:5px;">🔒 Only Admin can change the deadline.</p>`}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditProject('${projectId}')">Save Changes</button>
+    </div>
+  `);
+}
+
+async function submitEditProject(projectId) {
+  const updates = {
+    projectName: val('epName'),
+    description: val('epDesc'),
+    impact: val('epImpact'),
+    priority: val('epPriority'),
+    dependency: val('epDependency'),
+    stakeholders: val('epStakeholders')
+  };
+  const completionEl = document.getElementById('epCompletionDate');
+  if (completionEl) updates.actualCompletionDate = completionEl.value;
+  if (state.user.role === 'Admin') {
+    const etaEl = document.getElementById('epEta');
+    if (etaEl) updates.eta = etaEl.value;
+  }
+  if (!updates.projectName) { showToast('⚠️ Project name is required'); return; }
+  if (!updates.description) { showToast('⚠️ Objective is required'); return; }
+  if (!updates.impact) { showToast('⚠️ Scope is required'); return; }
+  const res = await apiCall('updateProject', { projectId, updates });
+  if (!res.ok) { showToast('⚠️ ' + (res.error || 'Update failed')); return; }
+  closeModal();
+  showToast('✓ Project details updated');
+  patchLocalProject(res.data.project);
+}
+
+/* ============================================================
+   CHECK-IN ROW
+   ============================================================ */
+function renderCheckinRow(p) {
+  const logged = !!p.loggedToday;
+  return `
+    <div class="checkin-row ${logged ? 'logged' : ''}">
+      <input type="checkbox" id="checkin-${p.projectId}" ${logged ? 'checked' : ''}
+        onchange="onCheckinToggle('${p.projectId}', this)">
+      <label class="checkin-label" for="checkin-${p.projectId}">
+        ${logged ? `✓ Logged: ${escapeHtml(p.todaysLogType || '')}` : 'I worked on this project today'}
+      </label>
+      ${logged ? `<button class="link-btn" style="margin-left:auto;font-size:12px;" onclick="openProjectCheckinEdit('${p.projectId}',event)">Edit</button>` : ''}
+    </div>
+    ${logged && p.todaysLogDescription ? `<div class="checkin-note">"${escapeHtml(p.todaysLogDescription)}"</div>` : ''}`;
+}
+
+function onCheckinToggle(projectId, checkbox) {
+  if (checkbox.checked) {
+    checkbox.checked = false;
+    openCheckinModal(projectId, '', '');
+  } else {
+    checkbox.checked = true;
+    if (!confirm("Remove today's check-in for this project?")) { checkbox.checked = true; return; }
+    removeCheckin(projectId);
+  }
+}
+
+function openProjectCheckinEdit(projectId, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  const project = state.workspaceData ? state.workspaceData.projects.find(p => p.projectId === projectId) : null;
+  openCheckinModal(projectId, project ? project.todaysLogType : '', project ? project.todaysLogDescription : '');
+}
+
+function openCheckinModal(projectId, existingType, existingText) {
+  openModal(`
+    <div class="modal-header">
+      <h2>Log today's update</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>What kind of update? *</label>
+        <select id="checkinType" onchange="onCheckinTypeChange()">
+          <option value="">Select…</option>
+          ${UPDATE_TYPES.map(t => `<option value="${t}" ${existingType===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div id="checkinReasonWrap" class="field ${existingType ? '' : 'hidden'}">
+        <label>What happened? *</label>
+        <textarea id="checkinDesc" placeholder="Describe what you did or what changed.">${escapeHtml(existingText || '')}</textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCheckin('${projectId}')">${existingText ? 'Save changes' : 'Log it'}</button>
+    </div>
+  `);
+}
+
+function onCheckinTypeChange() {
+  const type = document.getElementById('checkinType').value;
+  document.getElementById('checkinReasonWrap').classList.toggle('hidden', !type);
+  if (type) setTimeout(() => document.getElementById('checkinDesc').focus(), 30);
+}
+
+const JUNK_ANSWERS = ['na','n/a','not applicable','none','nil','-','nothing',
+  'xyz','test','asdf','tbd','pending','ok','done','...','.','.','abc','idk'];
+function isJunkDescription(text) {
+  const normalized = String(text).trim().toLowerCase().replace(/[.\-_!]+$/g, '');
+  return normalized.length < 8 || JUNK_ANSWERS.includes(normalized);
+}
+
+async function submitCheckin(projectId) {
+  const updateType = val('checkinType');
+  const description = val('checkinDesc');
+  if (!updateType) { showToast('⚠️ Select what kind of update this is'); return; }
+  if (!description) { showToast('⚠️ A description is required'); return; }
+  if (isJunkDescription(description)) { showToast('⚠️ Please describe what actually happened'); return; }
+  const res = await apiCall('logDailyWork', { projectId, updateType, description });
+  if (!res.ok) { showToast('⚠️ ' + (res.error || 'Log failed')); return; }
+  closeModal();
+  showToast('✓ Logged — thanks for keeping this updated');
+  patchLocalProject({ projectId, loggedToday: true, todaysLogType: updateType, todaysLogDescription: description });
+}
+
+async function removeCheckin(projectId) {
+  const res = await apiCall('deleteDailyWork', { projectId });
+  if (!res.ok) { showToast('⚠️ ' + (res.error || 'Remove failed')); return; }
+  showToast('✓ Removed');
+  patchLocalProject({ projectId, loggedToday: false, todaysLogType: '', todaysLogDescription: '' });
+}
+
+/* ============================================================
+   PROJECT LOG PAGE
+   ============================================================ */
+const UPDATE_TYPE_COLORS = {
+  'Update Progress': 'pill-green',
+  'Update Delay': 'pill-red',
+  'Update Deprioritization': 'pill-amber'
+};
+
+async function openProjectLogPage(projectId) {
+  const project = state.workspaceData ? state.workspaceData.projects.find(p => p.projectId === projectId) : null;
+  state.currentProjectLogId = projectId;
+  document.getElementById('mainContainer').innerHTML = `
+    <button class="back-link" onclick="renderWorkspace()">← Back to ${state.workspaceData ? escapeHtml(state.workspaceData.user.name) : 'Workspace'}'s Workspace</button>
+    <div class="section-title">📜 ${project ? escapeHtml(project.projectName) : 'Project'} — Log History</div>
+    <div id="projectLogPageBody" style="padding:40px 20px;text-align:center;color:var(--ink-faint);">Loading…</div>
+  `;
+  const res = await apiCall('getProjectLogs', { projectId });
+  const body = document.getElementById('projectLogPageBody');
+  if (!body) return;
+  if (!res.ok) { body.outerHTML = `<div class="empty-state">⚠️ ${escapeHtml(res.error || 'Could not load.')}</div>`; return; }
+  const logs = res.data.logs || [];
+  if (logs.length === 0) {
+    body.outerHTML = '<div class="empty-state"><span class="empty-state-icon">📜</span>No updates logged yet for this project.</div>';
+    return;
+  }
+  body.outerHTML = `<div class="card-list">${logs.map(l => `
+    <div class="item-card">
+      <div class="item-card-top" style="margin-bottom:4px;">
+        <span class="pill ${UPDATE_TYPE_COLORS[l.type] || 'pill-neutral'}">${escapeHtml(l.type || '')}</span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--ink-faint);">
+          ${formatDateDisplay(l.date)}${l.isToday ? ' · Today' : ''}
+        </span>
+      </div>
+      <div style="font-size:13.5px;color:var(--ink-soft);line-height:1.5;">${escapeHtml(l.description)}</div>
+      ${l.isToday ? `<button class="link-btn" style="font-size:12px;margin-top:8px;" onclick="openProjectCheckinEdit('${projectId}',{stopPropagation(){}})">Edit today's entry</button>` : ''}
+    </div>`).join('')}</div>`;
+}
+
+/* ============================================================
+   IDEA & ADHOC CARDS
+   ============================================================ */
+function renderIdeaCard(i, canEdit) {
+  return `<div class="item-card">
+    <div class="item-card-top">
+      <div class="item-title">${escapeHtml(i.description)}</div>
+      <span class="pill pill-neutral">${escapeHtml(i.type)}</span>
+    </div>
+    ${i.expectedImpact ? `<div class="item-desc"><b>Expected impact:</b> ${escapeHtml(i.expectedImpact)}</div>` : ''}
+  </div>`;
+}
+
+function renderAdhocCard(a, canEdit) {
+  return `<div class="item-card">
+    <div class="item-card-top">
+      <div class="item-title">${escapeHtml(a.task)}</div>
+      <span class="pill pill-neutral">${a.timeSpent}h</span>
+    </div>
+    ${a.description ? `<div class="item-desc">${escapeHtml(a.description)}</div>` : ''}
+    <div class="meta-row">
+      ${a.source ? `<div class="meta-item">Source: <b>${escapeHtml(a.source)}</b></div>` : ''}
+      <div class="meta-item">Date: <b>${formatDateDisplay(a.date)}</b></div>
+    </div>
+  </div>`;
+}
+
+function renderHistoryItem(h) {
+  return `<div class="item-card" style="padding:13px 18px;">
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-faint);margin-bottom:4px;">${formatDateTimeDisplay(h['Timestamp'])}</div>
+    <div style="font-size:13.5px;"><b>${escapeHtml(h['Module'])}</b> — ${escapeHtml(h['Action'])}${h['Field Changed'] ? ' · ' + escapeHtml(h['Field Changed']) : ''}</div>
+    ${h['Field Changed'] ? `<div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px;">${escapeHtml(String(h['Old Value']||'—'))} → ${escapeHtml(String(h['New Value']||'—'))}</div>` : ''}
+  </div>`;
+}
+
+/* ============================================================
+   LOCAL STATE PATCHING (no refetch needed)
+   ============================================================ */
+function patchLocalProject(updatedProject) {
+  if (!state.workspaceData) return;
+  const idx = state.workspaceData.projects.findIndex(p => p.projectId === updatedProject.projectId);
+  if (idx !== -1) state.workspaceData.projects[idx] = { ...state.workspaceData.projects[idx], ...updatedProject };
+  renderWorkspaceTabContent();
+}
+
+async function updateProjectField(projectId, field, value) {
+  const updates = {};
+  updates[field] = value;
+  const res = await apiCall('updateProject', { projectId, updates });
+  if (!res.ok) { showToast('⚠️ ' + (res.error || 'Update failed')); return; }
+  showToast('✓ Saved');
+  patchLocalProject(res.data.project);
+}
+
+/* ============================================================
+   ADD MODALS
+   ============================================================ */
+function openProjectModal() {
+  const dd = document.getElementById('addPickerDropdown');
+  if (dd) dd.classList.add('hidden');
+  openModal(`
+    <div class="modal-header">
+      <h2>📁 Add Project</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Project Name *</label><input id="pmName" placeholder="e.g. 3PL Cost Optimisation"></div>
+      <div class="field"><label>Objective *</label><textarea id="pmDesc" placeholder="What is this project meant to achieve?"></textarea></div>
+      <div class="field"><label>Status</label>
+        <select id="pmStatus">
+          ${PROJECT_STATUSES.filter(s => s !== 'Delayed').map(s =>
+            `<option value="${s}">${s==='Open' ? 'Open / To Be Picked' : s}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="field"><label>ETD *</label><input type="date" id="pmEta"></div>
+      <div class="field"><label>Scope *</label><input id="pmImpact" placeholder="What's in/out of scope"></div>
+      <div class="field"><label>Priority</label>
+        <select id="pmPriority">${PRIORITIES.map(p => `<option value="${p}">${p}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Dependency</label><input id="pmDependency" placeholder="Optional"></div>
+      <div class="field"><label>Stakeholders</label><input id="pmStakeholders" placeholder="e.g. Ops team, Finance (optional)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitProjectModal()">Add Project</button>
+    </div>
+  `);
+}
+async function submitProjectModal() {
+  const project = {
+    projectName: val('pmName'), description: val('pmDesc'), status: val('pmStatus'),
+    eta: val('pmEta'), impact: val('pmImpact'), priority: val('pmPriority'),
+    dependency: val('pmDependency'), stakeholders: val('pmStakeholders')
+  };
+  if (!project.projectName || !project.eta) { showToast('⚠️ Name and ETD are required'); return; }
+  if (!project.description) { showToast('⚠️ Objective is required'); return; }
+  if (!project.impact) { showToast('⚠️ Scope is required'); return; }
+  const res = await apiCall('createProject', { project });
+  if (!res.ok) { showToast('⚠️ ' + (res.error || 'Could not add project')); return; }
+  closeModal();
+  showToast('✓ Project added');
+  if (state.workspaceData) { state.workspaceData.projects.push(res.data.project); renderWorkspace(); }
+}
+
+function openIdeaModal() {
+  const dd = document.getElementById('addPickerDropdown');
+  if (dd) dd.classList.add('hidden');
+  openModal(`
+    <div class="modal-header">
+      <h2>💡 Add Idea</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Type</label>
+        <select id="imType">${IDEA_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Idea Description *</label><textarea id="imDesc" placeholder="What's the idea?"></textarea></div>
+      <div class="field"><label>Expected Impact</label><input id="imImpact" placeholder="What benefit could this create?"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitIdeaModal()">Add Idea</button>
+    </div>
+  `);
+}
+async function submitIdeaModal() {
+  const idea = { type: val('imType'), description: val('imDesc'), expectedImpact: val('imImpact') };
+  if (!idea.description) { showToast('⚠️ Description is required'); return; }
+  const res = await apiCall('createIdea', { idea });
+  if (!res.ok) { showToast('⚠️ ' + (res.error || 'Could not add idea')); return; }
+  closeModal();
+  showToast('✓ Idea captured');
+  if (state.workspaceData) { state.workspaceData.ideas.push(res.data.idea); renderWorkspace(); }
+}
+
+function openAdhocModal() {
+  const dd = document.getElementById('addPickerDropdown');
+  if (dd) dd.classList.add('hidden');
+  const today = new Date().toISOString().slice(0, 10);
+  openModal(`
+    <div class="modal-header">
+      <h2>⚡ Add Ad-hoc Work</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Task *</label><input id="amTask" placeholder="e.g. Fix dashboard issue"></div>
+      <div class="field"><label>Time Spent (hours) *</label><input type="number" step="0.25" min="0" id="amTime" placeholder="1.5"></div>
+      <div class="field"><label>Description</label><textarea id="amDesc" placeholder="What did you do?"></textarea></div>
+      <div class="field"><label>Source</label><input id="amSource" placeholder="e.g. Manager request"></div>
+      <div class="field"><label>Date</label><input type="date" id="amDate" value="${today}"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAdhocModal()">Add Entry</button>
+    </div>
+  `);
+}
+async function submitAdhocModal() {
+  const adhoc = {
+    task: val('amTask'), timeSpent: val('amTime'),
+    description: val('amDesc'), source: val('amSource'), date: val('amDate')
+  };
+  if (!adhoc.task || !adhoc.timeSpent) { showToast('⚠️ Task and time spent are required'); return; }
+  const res = await apiCall('createAdhoc', { adhoc });
+  if (!res.ok) { showToast('⚠️ ' + (res.error || 'Could not add entry')); return; }
+  closeModal();
+  showToast('✓ Logged — thanks for keeping this updated');
+  if (state.workspaceData) { state.workspaceData.adhoc.push(res.data.adhoc); renderWorkspace(); }
+}
+
+/* ============================================================
+   ADMIN: TEAM MANAGEMENT
+   ============================================================ */
+async function openTeamManagement() {
+  closeDropdowns();
+  renderLoading();
+  const res = await apiCall('getAllUsers', {});
+  if (!res.ok || !res.data) { renderError(res.error || 'Could not load users.'); return; }
+  renderTeamManagement(res.data.users);
+}
+
+function renderTeamManagement(users) {
+  const rows = users.map(u => `
+    <tr>
+      <td style="font-family:var(--font-body);font-size:18px;">${u.avatar}</td>
+      <td class="name-cell">${escapeHtml(u.name)}</td>
+      <td style="font-family:var(--font-body);font-size:13px;">${escapeHtml(u.email)}</td>
+      <td><span class="role-badge role-${u.role}">${u.role}</span></td>
+      <td class="status-${u.status}" style="font-family:var(--font-body);font-size:13px;">${u.status}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="openEditUserModal('${escapeAttr(u.userId)}','${escapeAttr(u.name)}','${escapeAttr(u.email)}','${u.avatar}')">Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="adminResetPw('${escapeAttr(u.userId)}','${escapeAttr(u.email)}')">Reset PW</button>
+        ${u.status === 'Active'
+          ? `<button class="btn btn-danger btn-sm" onclick="deactivateUser('${escapeAttr(u.userId)}')">Deactivate</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="reactivateUser('${escapeAttr(u.userId)}')">Reactivate</button>`}
+      </td>
+    </tr>`).join('');
+
+  document.getElementById('mainContainer').innerHTML = `
+    <button class="back-link" onclick="goHome()">← Back to Cumin</button>
+    <div class="section-title">
+      👑 Team Management
+      <button class="btn btn-warm btn-sm" onclick="openAddUserModal()">+ Add Member</button>
+    </div>
+    <div class="mgmt-table-wrap">
+      <table>
+        <thead><tr><th></th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function openAddUserModal() {
+  const avatarOptions = Object.keys(AVATAR_COLORS).map(a => `<option value="${a}">${a}</option>`).join('');
+  openModal(`
+    <div class="modal-header">
+      <h2>Add Team Member</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Name *</label><input id="auName" placeholder="Full name"></div>
+      <div class="field"><label>Work Email *</label><input type="email" id="auEmail" placeholder="name@company.com"></div>
+      <div class="field"><label>Avatar</label><select id="auAvatar">${avatarOptions}</select></div>
+      <p style="font-size:12.5px;color:var(--ink-soft);margin-top:4px;">A random 6-digit password will be generated and emailed to them automatically.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddUser()">Create User</button>
+    </div>
+  `);
+}
+async function submitAddUser() {
+  const user = { name: val('auName'), email: val('auEmail'), avatar: val('auAvatar') };
+  if (!user.name || !user.email) { showToast('⚠️ Name and email required'); return; }
+  const res = await apiCall('addUser', { user });
+  if (!res.ok) { showToast('⚠️ ' + (res.error || 'Could not add user')); return; }
+  closeModal();
+  showToast('✓ Welcome email sent — they\'re all set');
+  openTeamManagement();
+}
+
+function openEditUserModal(userId, name, email, avatar) {
+  const avatarOptions = Object.keys(AVATAR_COLORS).map(a =>
+    `<option value="${a}" ${a===avatar?'selected':''}>${a}</option>`
+  ).join('');
+  openModal(`
+    <div class="modal-header">
+      <h2>Edit ${escapeHtml(name)}</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Name</label><input id="euName" value="${escapeAttr(name)}"></div>
+      <div class="field"><label>Work Email</label><input id="euEmail" value="${escapeAttr(email)}"></div>
+      <div class="field"><label>Avatar</label><select id="euAvatar">${avatarOptions}</select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditUser('${escapeAttr(userId)}')">Save Changes</button>
+    </div>
+  `);
+}
+async function submitEditUser(userId) {
+  const updates = { name: val('euName'), email: val('euEmail'), avatar: val('euAvatar') };
+  const res = await apiCall('updateUser', { userId, updates });
+  if (!res.ok) { showToast('⚠️ ' + (res.error || 'Update failed')); return; }
+  closeModal();
+  showToast('✓ Updated');
+  openTeamManagement();
+}
+
+async function deactivateUser(userId) {
+  if (!confirm('Deactivate this user? Their history stays intact and they can be reactivated later.')) return;
+  const res = await apiCall('deactivateUser', { userId });
+  showToast(res.ok ? '✓ Deactivated' : `⚠️ ${res.error || 'Failed'}`);
+  if (res.ok) openTeamManagement();
+}
+async function reactivateUser(userId) {
+  const res = await apiCall('reactivateUser', { userId });
+  showToast(res.ok ? '✓ Reactivated' : `⚠️ ${res.error || 'Failed'}`);
+  if (res.ok) openTeamManagement();
+}
+async function adminResetPw(userId, email) {
+  if (!confirm(`Send a new password to ${email}?`)) return;
+  const res = await apiCall('adminResetPassword', { userId });
+  showToast(res.ok ? '✓ New password emailed' : `⚠️ ${res.error || 'Failed'}`);
+}
+
+/* ============================================================
+   UTILS
+   ============================================================ */
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+    btn.setAttribute('aria-label', 'Hide password');
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+    btn.setAttribute('aria-label', 'Show password');
+  }
+}
+
+function val(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, m =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])
+  );
+}
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function formatDateInput(dateVal) {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+}
+function formatDateDisplay(dateVal) {
+  if (!dateVal) return '—';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function formatDateTimeDisplay(dateVal) {
+  if (!dateVal) return '—';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' — ' +
+    d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+</script>
+</body>
+</html>
