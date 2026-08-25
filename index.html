@@ -410,6 +410,11 @@ tr.total-row td{font-weight:800;background:var(--surface-alt);}
   box-shadow:var(--shadow-lg);opacity:0;transition:opacity .2s, transform .2s;pointer-events:none;
 }
 .save-toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+.spin{
+  display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,0.35);
+  border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
 
 .add-btn-wrap{position:relative;}
 
@@ -484,7 +489,7 @@ tr.total-row td{font-weight:800;background:var(--surface-alt);}
             <button type="button" class="password-eye" onclick="togglePasswordVisibility('loginPassword', this)" aria-label="Show password">👁</button>
           </div>
         </div>
-        <button class="btn btn-warm btn-block" onclick="doLogin()">Log in</button>
+        <button id="btnLogin" class="btn btn-warm btn-block" onclick="doLogin()">Log in</button>
         <div style="text-align:center;margin-top:16px;">
           <button class="link-btn" onclick="showForgot()">Forgot password?</button>
         </div>
@@ -630,16 +635,18 @@ function authSuccess(msg) {
 }
 
 async function doLogin() {
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value.trim();
-  if (!email || !password) return authError('Enter your email and password.');
-  const res = await apiCall('login', { email, password });
-  if (!res.ok) return authError(res.error);
-  state.token = res.data.token;
-  state.user = res.data.user;
-  localStorage.setItem('townhall_token', state.token);
-  localStorage.setItem('townhall_user', JSON.stringify(state.user));
-  enterApp();
+  await withLoading('btnLogin', 'Logging in…', async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+    if (!email || !password) { authError('Enter your email and password.'); return; }
+    const res = await apiCall('login', { email, password });
+    if (!res.ok) { authError(res.error); return; }
+    state.token = res.data.token;
+    state.user = res.data.user;
+    localStorage.setItem('townhall_token', state.token);
+    localStorage.setItem('townhall_user', JSON.stringify(state.user));
+    enterApp();
+  });
 }
 
 async function doForgotPassword() {
@@ -1254,7 +1261,7 @@ function openCheckinModal(projectId, existingType, existingText) {
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="submitCheckin('${projectId}')">${existingText ? 'Save changes' : 'Log it'}</button>
+      <button id="btnSubmitCheckin" class="btn btn-primary" onclick="submitCheckin('${projectId}')">${existingText ? 'Save changes' : 'Log it'}</button>
     </div>
   `);
 }
@@ -1273,15 +1280,17 @@ function isJunkDescription(text) {
 }
 
 async function submitCheckin(projectId) {
-  const updateType = val('checkinType');
-  const description = val('checkinDesc');
-  if (!updateType) { showToast('⚠️ Select what kind of update this is'); return; }
-  if (!description) { showToast('⚠️ A reason is required'); return; }
-  if (isJunkDescription(description)) { showToast('⚠️ Please describe what actually happened'); return; }
-  const res = await apiCall('logDailyWork', { projectId, updateType, description });
-  if (!res.ok) { showToast('⚠️ ' + res.error); return; }
-  closeModal(); showToast('✓ Logged — thanks for keeping this updated');
-  patchLocalProject({ projectId, loggedToday: true, todaysLogType: updateType, todaysLogDescription: description });
+  await withLoading('btnSubmitCheckin', 'Saving…', async () => {
+    const updateType = val('checkinType');
+    const description = val('checkinDesc');
+    if (!updateType) { showToast('⚠️ Select what kind of update this is'); return; }
+    if (!description) { showToast('⚠️ A reason is required'); return; }
+    if (isJunkDescription(description)) { showToast('⚠️ Please describe what actually happened'); return; }
+    const res = await apiCall('logDailyWork', { projectId, updateType, description });
+    if (!res.ok) { showToast('⚠️ ' + res.error); return; }
+    closeModal(); showToast('✓ Logged — thanks for keeping this updated');
+    patchLocalProject({ projectId, loggedToday: true, todaysLogType: updateType, todaysLogDescription: description });
+  });
 }
 
 async function removeCheckin(projectId) {
@@ -1390,23 +1399,25 @@ function openProjectModal() {
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="submitProjectModal()">Add Project</button>
+      <button id="btnSubmitProject" class="btn btn-primary" onclick="submitProjectModal()">Add Project</button>
     </div>
   `);
 }
 async function submitProjectModal() {
-  const project = {
-    projectName: val('pmName'), description: val('pmDesc'), status: val('pmStatus'),
-    eta: val('pmEta'), impact: val('pmImpact'), priority: val('pmPriority'),
-    dependency: val('pmDependency'), stakeholders: val('pmStakeholders')
-  };
-  if (!project.projectName || !project.eta) { showToast('⚠️ Name and ETD are required'); return; }
-  if (!project.description) { showToast('⚠️ Objective is required'); return; }
-  if (!project.impact) { showToast('⚠️ Scope is required'); return; }
-  const res = await apiCall('createProject', { project });
-  if (!res.ok) { showToast('⚠️ ' + res.error); return; }
-  closeModal(); showToast('✓ Project added — nice work');
-  if (state.workspaceData) { state.workspaceData.projects.push(res.data.project); renderWorkspace(); }
+  await withLoading('btnSubmitProject', 'Adding…', async () => {
+    const project = {
+      projectName: val('pmName'), description: val('pmDesc'), status: val('pmStatus'),
+      eta: val('pmEta'), impact: val('pmImpact'), priority: val('pmPriority'),
+      dependency: val('pmDependency'), stakeholders: val('pmStakeholders')
+    };
+    if (!project.projectName || !project.eta) { showToast('⚠️ Name and ETD are required'); return; }
+    if (!project.description) { showToast('⚠️ Objective is required'); return; }
+    if (!project.impact) { showToast('⚠️ Scope is required'); return; }
+    const res = await apiCall('createProject', { project });
+    if (!res.ok) { showToast('⚠️ ' + res.error); return; }
+    closeModal(); showToast('✓ Project added — nice work');
+    if (state.workspaceData) { state.workspaceData.projects.push(res.data.project); renderWorkspace(); }
+  });
 }
 
 function openIdeaModal() {
@@ -1420,17 +1431,19 @@ function openIdeaModal() {
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="submitIdeaModal()">Add Idea</button>
+      <button id="btnSubmitIdea" class="btn btn-primary" onclick="submitIdeaModal()">Add Idea</button>
     </div>
   `);
 }
 async function submitIdeaModal() {
-  const idea = { type: val('imType'), description: val('imDesc'), expectedImpact: val('imImpact') };
-  if (!idea.description) { showToast('⚠️ Description is required'); return; }
-  const res = await apiCall('createIdea', { idea });
-  if (!res.ok) { showToast('⚠️ ' + res.error); return; }
-  closeModal(); showToast('✓ Idea captured');
-  if (state.workspaceData) { state.workspaceData.ideas.push(res.data.idea); renderWorkspace(); }
+  await withLoading('btnSubmitIdea', 'Adding…', async () => {
+    const idea = { type: val('imType'), description: val('imDesc'), expectedImpact: val('imImpact') };
+    if (!idea.description) { showToast('⚠️ Description is required'); return; }
+    const res = await apiCall('createIdea', { idea });
+    if (!res.ok) { showToast('⚠️ ' + res.error); return; }
+    closeModal(); showToast('✓ Idea captured');
+    if (state.workspaceData) { state.workspaceData.ideas.push(res.data.idea); renderWorkspace(); }
+  });
 }
 
 function openAdhocModal() {
@@ -1447,17 +1460,19 @@ function openAdhocModal() {
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="submitAdhocModal()">Add Entry</button>
+      <button id="btnSubmitAdhoc" class="btn btn-primary" onclick="submitAdhocModal()">Add Entry</button>
     </div>
   `);
 }
 async function submitAdhocModal() {
-  const adhoc = { task: val('amTask'), timeSpent: val('amTime'), description: val('amDesc'), source: val('amSource'), date: val('amDate') };
-  if (!adhoc.task || !adhoc.timeSpent) { showToast('⚠️ Task and time spent are required'); return; }
-  const res = await apiCall('createAdhoc', { adhoc });
-  if (!res.ok) { showToast('⚠️ ' + res.error); return; }
-  closeModal(); showToast('✓ Logged — thanks for keeping this updated');
-  if (state.workspaceData) { state.workspaceData.adhoc.push(res.data.adhoc); renderWorkspace(); }
+  await withLoading('btnSubmitAdhoc', 'Logging…', async () => {
+    const adhoc = { task: val('amTask'), timeSpent: val('amTime'), description: val('amDesc'), source: val('amSource'), date: val('amDate') };
+    if (!adhoc.task || !adhoc.timeSpent) { showToast('⚠️ Task and time spent are required'); return; }
+    const res = await apiCall('createAdhoc', { adhoc });
+    if (!res.ok) { showToast('⚠️ ' + res.error); return; }
+    closeModal(); showToast('✓ Logged — thanks for keeping this updated');
+    if (state.workspaceData) { state.workspaceData.adhoc.push(res.data.adhoc); renderWorkspace(); }
+  });
 }
 
 /* ============================================================
@@ -1579,6 +1594,17 @@ function togglePasswordVisibility(inputId, btn) {
     btn.textContent = '👁';
     btn.setAttribute('aria-label', 'Show password');
   }
+}
+
+/** Disables a submit button and shows a spinner while an async operation runs, re-enables after. */
+async function withLoading(btnId, label, asyncFn) {
+  const btn = document.getElementById(btnId);
+  if (!btn || btn.disabled) return; // already in flight
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:7px;"><span class="spin"></span>' + label + '</span>';
+  try { await asyncFn(); }
+  finally { btn.disabled = false; btn.innerHTML = original; }
 }
 
 function val(id) { return document.getElementById(id).value.trim(); }
