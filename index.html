@@ -919,8 +919,13 @@ function renderHome(data, summary) {
 
   document.getElementById('mainContainer').innerHTML = `
     <div class="greeting-banner">
-      <h1>${g.timeGreet}, ${escapeHtml(data.greetingName)} ${g.flair}</h1>
-      <p>${g.line}</p>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h1>${g.timeGreet}, ${escapeHtml(data.greetingName)} ${g.flair}</h1>
+          <p>${g.line}</p>
+        </div>
+        <button class="btn btn-warm btn-sm" style="margin-top:4px;white-space:nowrap;" onclick="openWorkspace('${data.currentUser.userId}')">📝 Log Your Activity</button>
+      </div>
       <div class="stat-row">
         <div class="stat-card"><div class="stat-num">${ps.active}</div><div class="stat-label">Active Projects</div></div>
         <div class="stat-card"><div class="stat-num">${ps.completed}</div><div class="stat-label">Completed</div></div>
@@ -970,6 +975,7 @@ function renderWorkspace() {
     { id: 'ideas', label: `Ideas (${d.ideas.length})` },
   ];
   if (d.isSelfOrAdmin) {
+    tabs.push({ id: 'biu', label: `BIU (${d.biu ? d.biu.length : 0})` });
     tabs.push({ id: 'week', label: '📊 This Week' });
     tabs.push({ id: 'adhoc', label: `Ad-hoc (${d.adhoc.length})` });
     tabs.push({ id: 'history', label: 'History' });
@@ -992,6 +998,7 @@ function renderWorkspace() {
               <button onclick="openProjectModal()"><span class="tp-icon">📁</span><span>Project<span class="tp-sub">A formal piece of work with an ETD</span></span></button>
               <button onclick="openIdeaModal()"><span class="tp-icon">💡</span><span>Idea<span class="tp-sub">Something worth exploring later</span></span></button>
               <button onclick="openAdhocModal()"><span class="tp-icon">⚡</span><span>Ad-hoc<span class="tp-sub">Unplanned work you did today</span></span></button>
+              <button onclick="openBIUModal()"><span class="tp-icon">📋</span><span>BIU<span class="tp-sub">Business as usual — recurring daily work</span></span></button>
             </div>
           </div>
         </div>` : ''}
@@ -1041,6 +1048,11 @@ function renderWorkspaceTabContent() {
     el.innerHTML = d.activityHistory.length === 0
       ? '<div class="empty-state">No activity yet — this fills in as work happens.</div>'
       : `<div class="card-list">${d.activityHistory.map(renderHistoryItem).join('')}</div>`;
+  } else if (state.currentWorkspaceTab === 'biu') {
+    const biuList = d.biu || [];
+    el.innerHTML = biuList.length === 0
+      ? '<div class="empty-state">No BIU items yet — click + Add to create one.</div>'
+      : `<div class="card-list">${biuList.map(b => renderBIUCard(b, d.isSelfOrAdmin)).join('')}</div>`;
   } else if (state.currentWorkspaceTab === 'week') {
     renderWeekTab(d.user.userId);
   }
@@ -1264,6 +1276,123 @@ function openCheckinModal(projectId, existingType, existingText) {
       <button id="btnSubmitCheckin" class="btn btn-primary" onclick="submitCheckin('${projectId}')">${existingText ? 'Save changes' : 'Log it'}</button>
     </div>
   `);
+}
+
+function renderBIUCard(b, canEdit) {
+  return `<div class="item-card">
+    <div class="item-card-top">
+      <div class="item-title" onclick="openBIULogPage('${b.biuId}')" style="cursor:pointer;text-decoration:underline;text-decoration-color:transparent;transition:text-decoration-color .15s;" onmouseover="this.style.textDecorationColor='var(--ink-faint)'" onmouseout="this.style.textDecorationColor='transparent'">${escapeHtml(b.title)}</div>
+    </div>
+    ${b.description ? `<div class="item-desc">${escapeHtml(b.description)}</div>` : ''}
+    ${canEdit ? renderBIUCheckinRow(b) : ''}
+  </div>`;
+}
+
+function renderBIUCheckinRow(b) {
+  const logged = !!b.loggedToday;
+  return `<div class="checkin-row ${logged ? 'logged' : ''}" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+    <input type="checkbox" id="biu-checkin-${b.biuId}" ${logged ? 'checked' : ''} onchange="onBIUCheckinToggle('${b.biuId}', this)">
+    <label class="checkin-label" for="biu-checkin-${b.biuId}">${logged ? '✓ Logged today' : 'I worked on this today'}</label>
+    ${logged ? `<button class="link-btn" style="margin-left:auto;font-size:12px;" onclick="openBIUCheckinEdit('${b.biuId}', event)">Edit</button>` : ''}
+  </div>
+  ${logged && b.todaysLogDescription ? `<div class="checkin-note">"${escapeHtml(b.todaysLogDescription)}"</div>` : ''}`;
+}
+
+function onBIUCheckinToggle(biuId, checkbox) {
+  if (checkbox.checked) { checkbox.checked = false; openBIUCheckinModal(biuId, ''); }
+  else { checkbox.checked = true; if (!confirm("Remove today's log for this BIU item?")) { checkbox.checked = true; return; } removeBIUCheckin(biuId); }
+}
+
+function openBIUCheckinEdit(biuId, event) {
+  if (event) event.stopPropagation();
+  const b = (state.workspaceData.biu || []).find(x => x.biuId === biuId);
+  openBIUCheckinModal(biuId, b ? b.todaysLogDescription : '');
+}
+
+function openBIUCheckinModal(biuId, existingText) {
+  openModal(`
+    <div class="modal-header"><h2>Log BIU work</h2><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Note (optional)</label><textarea id="biuCheckinDesc" placeholder="What did you do on this today?">${escapeHtml(existingText || '')}</textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button id="btnBIUCheckin" class="btn btn-primary" onclick="submitBIUCheckin('${biuId}')">${existingText ? 'Save' : 'Log it'}</button>
+    </div>`);
+}
+
+async function submitBIUCheckin(biuId) {
+  await withLoading('btnBIUCheckin', 'Saving…', async () => {
+    const description = val('biuCheckinDesc');
+    const res = await apiCall('logBIUWork', { biuId, description });
+    if (!res.ok) { showToast('⚠️ ' + res.error); return; }
+    closeModal(); showToast('✓ Logged');
+    if (state.workspaceData && state.workspaceData.biu) {
+      const idx = state.workspaceData.biu.findIndex(b => b.biuId === biuId);
+      if (idx !== -1) { state.workspaceData.biu[idx].loggedToday = true; state.workspaceData.biu[idx].todaysLogDescription = description; }
+      renderWorkspaceTabContent();
+    }
+  });
+}
+
+async function removeBIUCheckin(biuId) {
+  const res = await apiCall('deleteDailyWork', { projectId: 'BIU:' + biuId });
+  if (!res.ok) { showToast('⚠️ ' + res.error); return; }
+  showToast('✓ Removed');
+  if (state.workspaceData && state.workspaceData.biu) {
+    const idx = state.workspaceData.biu.findIndex(b => b.biuId === biuId);
+    if (idx !== -1) { state.workspaceData.biu[idx].loggedToday = false; state.workspaceData.biu[idx].todaysLogDescription = ''; }
+    renderWorkspaceTabContent();
+  }
+}
+
+async function openBIULogPage(biuId) {
+  const b = (state.workspaceData && state.workspaceData.biu || []).find(x => x.biuId === biuId);
+  document.getElementById('mainContainer').innerHTML = `
+    <button class="back-link" onclick="renderWorkspace()">← Back to workspace</button>
+    <div class="section-title">📋 ${b ? escapeHtml(b.title) : 'BIU'} — Log History</div>
+    <div id="biuLogPageBody" style="padding:40px;text-align:center;color:var(--ink-faint);">Loading…</div>`;
+  const res = await apiCall('getBIULogs', { biuId });
+  const body = document.getElementById('biuLogPageBody');
+  if (!body) return;
+  if (!res.ok) { body.outerHTML = `<div class="empty-state">⚠️ ${escapeHtml(res.error)}</div>`; return; }
+  const logs = res.data.logs;
+  if (logs.length === 0) { body.outerHTML = '<div class="empty-state">No logs yet for this BIU item.</div>'; return; }
+  body.outerHTML = `<div class="card-list">${logs.map(l => `
+    <div class="item-card">
+      <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);margin-bottom:4px;">${formatDateDisplay(l.date)}${l.isToday ? ' · Today' : ''}</div>
+      <div style="font-size:13.5px;color:var(--ink-soft);">${l.description ? escapeHtml(l.description) : '<i style="color:var(--ink-faint)">No note added</i>'}</div>
+      ${l.isToday ? `<button class="link-btn" style="font-size:12px;margin-top:8px;" onclick="openBIUCheckinEdit('${biuId}', {stopPropagation(){}})">Edit today's entry</button>` : ''}
+    </div>`).join('')}</div>`;
+}
+
+function openBIUModal() {
+  toggleAddPicker();
+  openModal(`
+    <div class="modal-header"><h2>📋 Add BIU Item</h2><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Title *</label><input id="biuTitle" placeholder="e.g. Daily ops review, Vendor calls"></div>
+      <div class="field"><label>Description (optional)</label><textarea id="biuDesc" placeholder="What does this involve?"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button id="btnSubmitBIU" class="btn btn-primary" onclick="submitBIUModal()">Add BIU Item</button>
+    </div>`);
+}
+
+async function submitBIUModal() {
+  await withLoading('btnSubmitBIU', 'Adding…', async () => {
+    const biu = { title: val('biuTitle'), description: val('biuDesc') };
+    if (!biu.title) { showToast('⚠️ Title is required'); return; }
+    const res = await apiCall('createBIU', { biu });
+    if (!res.ok) { showToast('⚠️ ' + res.error); return; }
+    closeModal(); showToast('✓ BIU item added');
+    if (state.workspaceData) {
+      if (!state.workspaceData.biu) state.workspaceData.biu = [];
+      state.workspaceData.biu.push(res.data.biu);
+      renderWorkspace();
+    }
+  });
 }
 
 function onCheckinTypeChange() {
