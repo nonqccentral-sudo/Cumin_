@@ -1036,14 +1036,25 @@ function renderWorkspaceTabContent() {
     el.innerHTML = d.projects.length === 0
       ? '<div class="empty-state">Nothing here yet — click + Add to start your first project.</div>'
       : `<div class="card-list">${d.projects.map(p => renderProjectCard(p, canEdit)).join('')}</div>`;
+    // Load dependency progress asynchronously
+    if (canEdit && d.projects.length > 0) {
+      d.projects.forEach(p => {
+        if (p.dependency) loadProjectDependencies(p.projectId);
+      });
+    }
   } else if (state.currentWorkspaceTab === 'ideas') {
     el.innerHTML = d.ideas.length === 0
       ? '<div class="empty-state">No ideas logged yet — every good project starts with one.</div>'
       : `<div class="card-list">${d.ideas.map(i => renderIdeaCard(i, canEdit)).join('')}</div>`;
   } else if (state.currentWorkspaceTab === 'adhoc') {
-    el.innerHTML = d.adhoc.length === 0
+    const activeAdhoc = d.adhoc.filter(a => a.status !== 'Completed');
+    const completedAdhoc = d.adhoc.filter(a => a.status === 'Completed');
+    const depsSection = renderDependenciesSection(d.myDependencies, d.isSelfOrAdmin);
+    const adhocHtml = d.adhoc.length === 0
       ? '<div class="empty-state">Nothing logged yet — you\'re all caught up.</div>'
-      : `<div class="card-list">${d.adhoc.map(a => renderAdhocCard(a, canEdit)).join('')}</div>`;
+      : (activeAdhoc.length > 0 ? `<div class="card-list">${activeAdhoc.map(a => renderAdhocCard(a, canEdit)).join('')}</div>` : '') +
+        (completedAdhoc.length > 0 ? `<details style="margin-top:14px;"><summary style="cursor:pointer;font-size:13px;color:var(--ink-faint);font-weight:600;">Completed (${completedAdhoc.length})</summary><div class="card-list" style="margin-top:8px;">${completedAdhoc.map(a => renderAdhocCard(a, false)).join('')}</div></details>` : '');
+    el.innerHTML = adhocHtml + depsSection;
   } else if (state.currentWorkspaceTab === 'history') {
     el.innerHTML = d.activityHistory.length === 0
       ? '<div class="empty-state">No activity yet — this fills in as work happens.</div>'
@@ -1164,14 +1175,16 @@ function renderProjectCard(p, canEdit) {
     ${renderZoneBar(p)}
     <div class="meta-row">
       <div class="meta-item">ETD: <b>${formatDateDisplay(p.eta)}</b></div>
-      ${p.impact ? `<div class="meta-item">Scope: <b>${escapeHtml(p.impact)}</b></div>` : ''}
+      ${p.impact ? `<div class="meta-item">Impact: <b>${escapeHtml(p.impact)}</b></div>` : ''}
       ${p.dependency ? `<div class="meta-item">Dependency: <b>${escapeHtml(p.dependency)}</b></div>` : ''}
     </div>
     ${renderStakeholders(p.stakeholders)}
     ${editControls}
     ${canEdit ? renderCheckinRow(p) : ''}
+    ${canEdit && p.dependency ? renderProjectDependencies(p.projectId) : ''}
   </div>`;
 }
+
 
 function openEditProjectModal(projectId) {
   const p = state.workspaceData.projects.find(x => x.projectId === projectId);
@@ -1182,7 +1195,7 @@ function openEditProjectModal(projectId) {
     <div class="modal-body">
       <div class="field"><label>Project Name</label><input id="epName" value="${escapeAttr(p.projectName)}"></div>
       <div class="field"><label>Objective *</label><textarea id="epDesc" required>${escapeHtml(p.description || '')}</textarea></div>
-      <div class="field"><label>Scope *</label><input id="epImpact" value="${escapeAttr(p.impact || '')}" required></div>
+      <div class="field"><label>Impact *</label><input id="epImpact" value="${escapeAttr(p.impact || '')}" required></div>
       <div class="field"><label>Priority</label><select id="epPriority">${PRIORITIES.map(pr => `<option value="${pr}" ${p.priority===pr?'selected':''}>${pr}</option>`).join('')}</select></div>
       <div class="field"><label>Dependency</label><input id="epDependency" value="${escapeAttr(p.dependency || '')}"></div>
       <div class="field"><label>Stakeholders</label><input id="epStakeholders" value="${escapeAttr(p.stakeholders || '')}" placeholder="e.g. Ops team, Finance (optional)"></div>
@@ -1220,7 +1233,7 @@ async function submitEditProject(projectId) {
   }
   if (!updates.projectName) { showToast('⚠️ Project name is required'); return; }
   if (!updates.description) { showToast('⚠️ Objective is required'); return; }
-  if (!updates.impact) { showToast('⚠️ Scope is required'); return; }
+  if (!updates.impact) { showToast('⚠️ Impact is required'); return; }
   const res = await apiCall('updateProject', { projectId, updates });
   if (!res.ok) { showToast('⚠️ ' + res.error); return; }
   closeModal(); showToast('✓ Project details updated');
@@ -1255,28 +1268,123 @@ function openProjectCheckinEdit(projectId, event) {
   openCheckinModal(projectId, project ? project.todaysLogType : '', project ? project.todaysLogDescription : '');
 }
 
-function openCheckinModal(projectId, existingType, existingText) {
+function openAdhocUpdateModal(adhocId) {
+  const today = new Date().toISOString().slice(0,10);
   openModal(`
-    <div class="modal-header"><h2>Log today's update</h2><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-header"><h2>Log Update</h2><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-body">
-      <div class="field">
-        <label>What kind of update? *</label>
-        <select id="checkinType" onchange="onCheckinTypeChange()">
-          <option value="">Select...</option>
-          ${UPDATE_TYPES.map(t => `<option value="${t}" ${existingType===t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </div>
-      <div id="checkinReasonWrap" class="field ${existingType ? '' : 'hidden'}">
-        <label>Reason *</label>
-        <textarea id="checkinDesc" placeholder="What happened? This is required.">${escapeHtml(existingText || '')}</textarea>
+      <div class="field"><label>What did you work on? *</label><textarea id="adhocUpdateText" placeholder="e.g. Sent follow-up email, reviewed document..."></textarea></div>
+      <div class="field"><label>Actual Date Worked</label><input type="date" id="adhocUpdateDate" value="${today}">
+        <p style="font-size:12px;color:var(--ink-faint);margin-top:4px;">Change this if you're logging work done on a different day.</p>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button id="btnSubmitCheckin" class="btn btn-primary" onclick="submitCheckin('${projectId}')">${existingText ? 'Save changes' : 'Log it'}</button>
+      <button id="btnAdhocUpdate" class="btn btn-primary" onclick="submitAdhocUpdate('${adhocId}')">Log it</button>
     </div>
   `);
 }
+
+async function submitAdhocUpdate(adhocId) {
+  await withLoading('btnAdhocUpdate', 'Saving…', async () => {
+    const update = val('adhocUpdateText');
+    const workDate = val('adhocUpdateDate');
+    if (!update) { showToast('⚠️ Please describe what you worked on'); return; }
+    const res = await apiCall('logAdHocUpdate', { adhocId, update, workDate });
+    if (!res.ok) { showToast('⚠️ ' + res.error); return; }
+    closeModal(); showToast('✓ Update logged');
+  });
+}
+
+async function closeAdhocTask(adhocId, btn) {
+  if (!confirm('Mark this task as completed? You can still view its history afterward.')) return;
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const res = await apiCall('closeAdHoc', { adhocId });
+  if (!res.ok) { showToast('⚠️ ' + res.error); btn.disabled = false; btn.textContent = '✓ Mark Completed'; return; }
+  showToast('✓ Task marked as completed');
+  if (state.workspaceData) {
+    const idx = state.workspaceData.adhoc.findIndex(a => a.adhocId === adhocId);
+    if (idx !== -1) { state.workspaceData.adhoc[idx].status = 'Completed'; renderWorkspaceTabContent(); }
+  }
+}
+
+async function openAdhocHistoryModal(adhocId) {
+  openModal(`
+    <div class="modal-header"><h2>Update History</h2><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body" id="adhocHistoryBody"><div style="text-align:center;color:var(--ink-faint);padding:20px;">Loading…</div></div>
+  `);
+  const res = await apiCall('getAdHocHistory', { adhocId });
+  const body = document.getElementById('adhocHistoryBody');
+  if (!body) return;
+  if (!res.ok) { body.innerHTML = `<div class="empty-state">⚠️ ${escapeHtml(res.error)}</div>`; return; }
+  const logs = res.data.logs;
+  if (logs.length === 0) { body.innerHTML = '<div class="empty-state">No updates logged yet.</div>'; return; }
+  body.innerHTML = `<div class="card-list">${logs.map(l => `
+    <div class="item-card" style="padding:12px 16px;">
+      <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);margin-bottom:4px;">${formatDateDisplay(l['Date'])}</div>
+      <div style="font-size:13.5px;color:var(--ink-soft);">${escapeHtml(l['Update'])}</div>
+    </div>`).join('')}</div>`;
+}
+
+// Dependencies section on workspace
+function renderDependenciesSection(deps, canEdit) {
+  if (!deps || deps.length === 0) return '';
+  const html = deps.map(d => {
+    const isOpen = d.status === 'Open';
+    return `<div class="item-card" style="border-left:3px solid ${isOpen ? 'var(--amber)' : 'var(--green)'};">
+      <div class="item-card-top">
+        <div><div class="item-title" style="font-size:14px;">📎 ${escapeHtml(d.projectName)}</div>
+        <div style="font-size:12px;color:var(--ink-faint);">Added by ${escapeHtml(d.ownerName)}</div></div>
+        <span class="pill ${isOpen ? 'pill-amber' : 'pill-green'}">${d.status}</span>
+      </div>
+      ${d.logs.length > 0 ? `<div class="item-desc" style="margin-top:8px;"><b>Latest:</b> ${escapeHtml(d.logs[0].update)} <span style="color:var(--ink-faint);font-size:12px;">(${formatDateDisplay(d.logs[0].date)})</span></div>` : '<div class="item-desc" style="color:var(--ink-faint);">No updates logged yet.</div>'}
+      ${canEdit && isOpen ? `
+      <div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <button class="btn btn-ghost btn-sm" onclick="openDepUpdateModal('${d.depId}')">+ Log Update</button>
+        <button class="btn btn-sm" style="background:var(--green-soft);color:var(--green);" onclick="closeDependency('${d.depId}', this)">✓ Mark Completed</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div style="margin-top:16px;"><div class="section-title" style="font-size:14px;margin-bottom:10px;">📎 My Dependencies</div><div class="card-list">${html}</div></div>`;
+}
+
+function openDepUpdateModal(depId) {
+  const today = new Date().toISOString().slice(0,10);
+  openModal(`
+    <div class="modal-header"><h2>Log Dependency Update</h2><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>What did you work on? *</label><textarea id="depUpdateText" placeholder="Describe your progress..."></textarea></div>
+      <div class="field"><label>Date</label><input type="date" id="depUpdateDate" value="${today}"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button id="btnDepUpdate" class="btn btn-primary" onclick="submitDepUpdate('${depId}')">Log it</button>
+    </div>
+  `);
+}
+
+async function submitDepUpdate(depId) {
+  await withLoading('btnDepUpdate', 'Saving…', async () => {
+    const update = val('depUpdateText');
+    const workDate = val('depUpdateDate');
+    if (!update) { showToast('⚠️ Please describe your progress'); return; }
+    const res = await apiCall('logAdHocUpdate', { adhocId: depId, update, workDate });
+    if (!res.ok) { showToast('⚠️ ' + res.error); return; }
+    closeModal(); showToast('✓ Update logged');
+    await openWorkspace(state.currentWorkspaceUserId);
+  });
+}
+
+async function closeDependency(depId, btn) {
+  if (!confirm('Mark this dependency as completed? The project owner will be able to see it.')) return;
+  btn.disabled = true;
+  const res = await apiCall('closeDependency', { depId });
+  if (!res.ok) { showToast('⚠️ ' + res.error); btn.disabled = false; return; }
+  showToast('✓ Dependency marked completed');
+  await openWorkspace(state.currentWorkspaceUserId);
+}
+
+
 
 function renderBAUCard(b, canEdit) {
   return `<div class="item-card">
@@ -1364,6 +1472,52 @@ async function openBAULogPage(bauId) {
       <div style="font-size:13.5px;color:var(--ink-soft);">${l.description ? escapeHtml(l.description) : '<i style="color:var(--ink-faint)">No note added</i>'}</div>
       ${l.isToday ? `<button class="link-btn" style="font-size:12px;margin-top:8px;" onclick="openBAUCheckinEdit('${bauId}', {stopPropagation(){}})">Edit today's entry</button>` : ''}
     </div>`).join('')}</div>`;
+}
+
+
+
+function renderProjectDependencies(projectId) {
+  return `<div id="proj-deps-${projectId}" style="margin-top:12px;"></div>`;
+}
+
+async function loadProjectDependencies(projectId) {
+  const res = await apiCall('getDependencies', { projectId });
+  const el = document.getElementById('proj-deps-' + projectId);
+  if (!res.ok || !el || res.data.dependencies.length === 0) return;
+  const deps = res.data.dependencies;
+  el.innerHTML = `<div style="padding-top:12px;border-top:1px solid var(--border);">
+    <div style="font-size:12px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Dependencies</div>
+    ${deps.map(d => `
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span class="pill ${d.status === 'Open' ? 'pill-amber' : 'pill-green'}" style="flex-shrink:0;">${d.status}</span>
+        <div><div style="font-size:13px;font-weight:700;">${escapeHtml(d.depUserName)}</div>
+        ${d.logs.length > 0 ? `<div style="font-size:12px;color:var(--ink-soft);">${escapeHtml(d.logs[0].update)} <span style="color:var(--ink-faint);">(${formatDateDisplay(d.logs[0].date)})</span></div>` : '<div style="font-size:12px;color:var(--ink-faint);">No updates yet</div>'}
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function openCheckinModal(projectId, existingType, existingText) {
+  openModal(`
+    <div class="modal-header"><h2>Log today's update</h2><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field">
+        <label>What kind of update? *</label>
+        <select id="checkinType" onchange="onCheckinTypeChange()">
+          <option value="">Select...</option>
+          ${UPDATE_TYPES.map(t => `<option value="${t}" ${existingType===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div id="checkinReasonWrap" class="field ${existingType ? '' : 'hidden'}">
+        <label>Reason *</label>
+        <textarea id="checkinDesc" placeholder="What happened? This is required.">${escapeHtml(existingText || '')}</textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button id="btnSubmitCheckin" class="btn btn-primary" onclick="submitCheckin('${projectId}')">${existingText ? 'Save changes' : 'Log it'}</button>
+    </div>
+  `);
 }
 
 function openBAUModal() {
@@ -1470,16 +1624,29 @@ function renderIdeaCard(i, canEdit) {
 }
 
 function renderAdhocCard(a, canEdit) {
-  return `<div class="item-card">
+  const isCompleted = a.status === 'Completed';
+  const isDateBased = a.type === 'Date-Based';
+  return `<div class="item-card" style="${isCompleted ? 'opacity:.7;' : ''}">
     <div class="item-card-top">
       <div class="item-title">${escapeHtml(a.task)}</div>
-      <span class="pill pill-neutral">${a.timeSpent}h</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+        <span class="pill ${isCompleted ? 'pill-green' : 'pill-neutral'}">${isCompleted ? 'Completed' : 'Open'}</span>
+        ${isDateBased ? '<span class="pill pill-neutral">Date-Based</span>' : ''}
+        <span class="pill pill-neutral">${a.timeSpent}h</span>
+      </div>
     </div>
-    <div class="item-desc">${escapeHtml(a.description || '')}</div>
+    ${a.description ? `<div class="item-desc">${escapeHtml(a.description)}</div>` : ''}
     <div class="meta-row">
+      ${isDateBased && a.targetDate ? `<div class="meta-item">Target: <b>${formatDateDisplay(a.targetDate)}</b></div>` : ''}
       ${a.source ? `<div class="meta-item">Source: <b>${escapeHtml(a.source)}</b></div>` : ''}
-      <div class="meta-item">Date: <b>${formatDateDisplay(a.date)}</b></div>
+      <div class="meta-item">Logged: <b>${formatDateDisplay(a.date)}</b></div>
     </div>
+    ${canEdit && !isCompleted ? `
+    <div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+      <button class="btn btn-ghost btn-sm" onclick="openAdhocUpdateModal('${a.adhocId}')">+ Log Update</button>
+      <button class="btn btn-sm" style="background:var(--green-soft);color:var(--green);" onclick="closeAdhocTask('${a.adhocId}', this)">✓ Mark Completed</button>
+    </div>` : ''}
+    ${canEdit ? `<button class="link-btn" style="font-size:12px;margin-top:8px;" onclick="openAdhocHistoryModal('${a.adhocId}')">📜 View updates</button>` : ''}
   </div>`;
 }
 
@@ -1521,7 +1688,7 @@ function openProjectModal() {
         <select id="pmStatus">${PROJECT_STATUSES.filter(s => s !== 'Delayed').map(s => `<option value="${s}">${s==='Open'?'Open / To Be Picked':s}</option>`).join('')}</select>
       </div>
       <div class="field"><label>ETD</label><input type="date" id="pmEta"></div>
-      <div class="field"><label>Scope *</label><input id="pmImpact" placeholder="e.g. What's in/out of scope" required></div>
+      <div class="field"><label>Impact *</label><input id="pmImpact" placeholder="e.g. What is the overall impact?" required></div>
       <div class="field"><label>Priority</label><select id="pmPriority">${PRIORITIES.map(p => `<option value="${p}">${p}</option>`).join('')}</select></div>
       <div class="field"><label>Dependency</label><input id="pmDependency" placeholder="Optional"></div>
       <div class="field"><label>Stakeholders</label><input id="pmStakeholders" placeholder="e.g. Ops team, Finance (optional)"></div>
@@ -1541,7 +1708,7 @@ async function submitProjectModal() {
     };
     if (!project.projectName || !project.eta) { showToast('⚠️ Name and ETD are required'); return; }
     if (!project.description) { showToast('⚠️ Objective is required'); return; }
-    if (!project.impact) { showToast('⚠️ Scope is required'); return; }
+    if (!project.impact) { showToast('⚠️ Impact is required'); return; }
     const res = await apiCall('createProject', { project });
     if (!res.ok) { showToast('⚠️ ' + res.error); return; }
     closeModal(); showToast('✓ Project added — nice work');
@@ -1577,15 +1744,35 @@ async function submitIdeaModal() {
 
 function openAdhocModal() {
   toggleAddPicker();
-  const today = new Date().toISOString().slice(0,10);
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0,10);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().slice(0,10);
   openModal(`
     <div class="modal-header"><h2>⚡ Add Ad-hoc Work</h2><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-body">
+      <div class="field">
+        <label>Type</label>
+        <select id="amType" onchange="onAdhocTypeChange()">
+          <option value="Normal">Normal — completed in one go</option>
+          <option value="Date-Based">Date-Based — scheduled for a specific date</option>
+        </select>
+      </div>
       <div class="field"><label>Task</label><input id="amTask" placeholder="e.g. Fix dashboard issue"></div>
+      <div id="amTargetDateWrap" class="field hidden">
+        <label>Target Date</label>
+        <input type="date" id="amTargetDate" max="${todayStr}">
+        <p style="font-size:12px;color:var(--ink-faint);margin-top:4px;">When was/is this work expected? You can log the actual date separately.</p>
+      </div>
       <div class="field"><label>Time Spent (hours)</label><input type="number" step="0.25" min="0" id="amTime" placeholder="1.5"></div>
       <div class="field"><label>Description</label><textarea id="amDesc" placeholder="What did you do?"></textarea></div>
       <div class="field"><label>Source</label><input id="amSource" placeholder="e.g. Manager request"></div>
-      <div class="field"><label>Date</label><input type="date" id="amDate" value="${today}"></div>
+      <div class="field">
+        <label>Date Worked</label>
+        <input type="date" id="amDate" value="${todayStr}" max="${todayStr}">
+        <p style="font-size:12px;color:var(--ink-faint);margin-top:4px;">You can log for today or any past date.</p>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
@@ -1593,10 +1780,21 @@ function openAdhocModal() {
     </div>
   `);
 }
+
+function onAdhocTypeChange() {
+  const type = document.getElementById('amType').value;
+  document.getElementById('amTargetDateWrap').classList.toggle('hidden', type !== 'Date-Based');
+}
 async function submitAdhocModal() {
   await withLoading('btnSubmitAdhoc', 'Logging…', async () => {
-    const adhoc = { task: val('amTask'), timeSpent: val('amTime'), description: val('amDesc'), source: val('amSource'), date: val('amDate') };
+    const type = val('amType');
+    const adhoc = {
+      type, task: val('amTask'), timeSpent: val('amTime'),
+      description: val('amDesc'), source: val('amSource'), date: val('amDate'),
+      targetDate: type === 'Date-Based' ? val('amTargetDate') : ''
+    };
     if (!adhoc.task || !adhoc.timeSpent) { showToast('⚠️ Task and time spent are required'); return; }
+    if (type === 'Date-Based' && !adhoc.targetDate) { showToast('⚠️ Please enter a target date'); return; }
     const res = await apiCall('createAdhoc', { adhoc });
     if (!res.ok) { showToast('⚠️ ' + res.error); return; }
     closeModal(); showToast('✓ Logged — thanks for keeping this updated');
