@@ -1770,8 +1770,10 @@ function openAdhocModal() {
       <div class="field"><label>Source</label><input id="amSource" placeholder="e.g. Manager request"></div>
       <div class="field">
         <label>Date Worked</label>
-        <input type="date" id="amDate" value="${todayStr}" max="${todayStr}">
-        <p style="font-size:12px;color:var(--ink-faint);margin-top:4px;">You can log for today or any past date.</p>
+        <select id="amDate">
+          <option value="${todayStr}">Today (${todayStr})</option>
+          <option value="${yesterdayStr}">Yesterday (${yesterdayStr})</option>
+        </select>
       </div>
     </div>
     <div class="modal-footer">
