@@ -404,7 +404,9 @@ tr.total-row td{font-weight:800;background:var(--surface-alt);}
 .collapsible-head{padding:10px 14px;background:var(--surface-alt);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;}
 .collapsible-body{padding:12px 14px;font-size:13px;}
 
-.save-toast{
+.skeleton-card { opacity:.45; pointer-events:none; }
+.skeleton-card * { animation:skeletonPulse 1.4s ease-in-out infinite; }
+@keyframes skeletonPulse { 0%,100%{opacity:.4;} 50%{opacity:.9;} }
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
   padding:10px 20px;border-radius:999px;font-size:13px;font-weight:700;z-index:200;
   box-shadow:var(--shadow-lg);opacity:0;transition:opacity .2s, transform .2s;pointer-events:none;
@@ -831,8 +833,10 @@ let homeDataCache = null;
 let homeSummaryCache = null;
 async function goHome() {
   state.currentWorkspaceUserId = null;
-  toggleUserMenu(); // closes if open
-  renderLoading();
+  toggleUserMenu();
+  // Show skeleton grid instantly while fetching
+  const skCard = '<div class="team-card skeleton-card"><div class="team-card-roof" style="background:var(--border)"></div><div class="team-card-body"><div style="width:40px;height:40px;border-radius:50%;background:var(--border);margin:0 auto 10px;"></div><div style="background:var(--border);height:11px;border-radius:4px;margin-bottom:8px;"></div><div style="background:var(--border);height:11px;border-radius:4px;width:60%;margin:0 auto;"></div></div></div>';
+  document.getElementById('mainContainer').innerHTML = '<div class="team-grid" style="margin-top:60px;">' + Array(8).fill(skCard).join('') + '</div>';
   const res = await apiCall('getHomeBundle', {});
   if (!res.ok || !res.data.home) { renderError(res.error || 'Could not load homepage.'); return; }
   homeDataCache = res.data.home;
@@ -870,10 +874,11 @@ function renderHome(data, summary) {
   let filteredTeam = data.teamCards;
   if (state.homeFilter !== 'All') {
     filteredTeam = data.teamCards.filter(t => {
-      if (state.homeFilter === 'Ongoing') return t.ongoing > 0;
-      if (state.homeFilter === 'Completed') return t.completed > 0;
-      if (state.homeFilter === 'Delayed') return t.ongoing > 0; // ongoing bucket includes delayed
-      if (state.homeFilter === 'My Work') return t.userId === state.user.userId;
+      if (state.homeFilter === 'To Be Picked') return t.toBePicked > 0;
+      if (state.homeFilter === 'In Progress')  return t.inProgress > 0;
+      if (state.homeFilter === 'Delayed')      return t.delayed > 0;
+      if (state.homeFilter === 'Completed')    return t.completed > 0;
+      if (state.homeFilter === 'My Work')      return t.userId === state.user.userId;
       return true;
     });
   }
@@ -887,9 +892,9 @@ function renderHome(data, summary) {
         <div class="team-card-avatar">${t.avatar}</div>
         <div class="team-card-name">${escapeHtml(t.name)}</div>
         <div class="team-card-stats">
-          <div class="tcs-item"><div class="tcs-num" style="color:var(--green)">${t.active}</div><div class="tcs-label">Active</div></div>
-          <div class="tcs-item"><div class="tcs-num" style="color:var(--amber)">${t.ongoing}</div><div class="tcs-label">Ongoing</div></div>
-          <div class="tcs-item"><div class="tcs-num" style="color:var(--primary)">${t.completed}</div><div class="tcs-label">Done</div></div>
+          <div class="tcs-item"><div class="tcs-num" style="color:var(--green)">${t.inProgress}</div><div class="tcs-label">In Progress</div></div>
+          <div class="tcs-item"><div class="tcs-num" style="color:var(--red)">${t.delayed}</div><div class="tcs-label">Delayed</div></div>
+          <div class="tcs-item"><div class="tcs-num" style="color:var(--primary)">${t.completed}</div><div class="tcs-label">Completed</div></div>
         </div>
       </div>
     </div>`;
@@ -900,18 +905,17 @@ function renderHome(data, summary) {
     const rows = summary.rows.map(r => `
       <tr>
         <td class="name-cell">${r.avatar} ${escapeHtml(r.name)}</td>
-        <td>${r.newCount}</td><td>${r.inProgress}</td><td>${r.completed}</td>
+        <td>${r.toBePicked}</td><td>${r.inProgress}</td><td style="color:${r.delayed>0?'var(--red)':'inherit'}">${r.delayed}</td><td>${r.completed}</td>
         <td>${r.ideas}</td><td>${r.adhoc}</td>
-        <td style="color:${r.delayed>0?'var(--red)':'inherit'}">${r.delayed}</td>
-      </tr>`).join('');
+        </tr>`).join('');
     summaryHtml = `
-      <div class="section-title">📊 Today at Cumin</div>
+      <div class="section-title">📊 Team Status Board</div>
       <div class="summary-table-wrap">
         <table>
-          <thead><tr><th>Team Member</th><th>New</th><th>In Progress</th><th>Completed</th><th>Ideas</th><th>Ad-hoc</th><th>Delayed</th></tr></thead>
+          <thead><tr><th>Team Member</th><th>🟡 To Be Picked</th><th>🔵 In Progress</th><th>🔴 Delayed</th><th>✅ Completed</th><th>💡 Ideas</th><th>⚡ Ad-hoc</th></tr></thead>
           <tbody>${rows}
-            <tr class="total-row"><td>Total</td><td>${summary.totals.newCount}</td><td>${summary.totals.inProgress}</td>
-              <td>${summary.totals.completed}</td><td>${summary.totals.ideas}</td><td>${summary.totals.adhoc}</td><td>${summary.totals.delayed}</td></tr>
+            <tr class="total-row"><td>Total</td><td>${summary.totals.toBePicked}</td><td>${summary.totals.inProgress}</td>
+              <td style="color:var(--red)">${summary.totals.delayed}</td><td>${summary.totals.completed}</td><td>${summary.totals.ideas}</td><td>${summary.totals.adhoc}</td></tr>
           </tbody>
         </table>
       </div>`;
@@ -927,17 +931,17 @@ function renderHome(data, summary) {
         <button class="btn btn-warm btn-sm" style="margin-top:4px;white-space:nowrap;" onclick="openWorkspace('${data.currentUser.userId}')">📝 Log Your Activity</button>
       </div>
       <div class="stat-row">
-        <div class="stat-card"><div class="stat-num">${ps.active}</div><div class="stat-label">Active Projects</div></div>
+        <div class="stat-card"><div class="stat-num">${ps.active}</div><div class="stat-label">Active</div></div>
+        <div class="stat-card"><div class="stat-num" style="color:var(--red)">${ps.delayed}</div><div class="stat-label">Delayed</div></div>
         <div class="stat-card"><div class="stat-num">${ps.completed}</div><div class="stat-label">Completed</div></div>
         <div class="stat-card"><div class="stat-num">${ps.ideas}</div><div class="stat-label">Ideas</div></div>
-        <div class="stat-card"><div class="stat-num">${ps.adhocTimeToday}</div><div class="stat-label">Ad-hoc Today</div></div>
       </div>
     </div>
 
     <div class="section-title">👥 Your Team <span class="count">${filteredTeam.length} of ${data.teamCards.length}</span></div>
     <div class="chip-row">
-      ${['All','My Work','Ongoing','Completed','Delayed'].map(f =>
-        `<button class="chip ${state.homeFilter===f?'active':''}" onclick="setHomeFilter('${f}')">${f}</button>`).join('')}
+      ${['All','My Work','To Be Picked','In Progress','Delayed','Completed'].map(f =>
+        `<button class="chip ${state.homeFilter===f?'active':''}" onclick="setHomeFilter('${f}')">${f==='To Be Picked'?'🟡 To Be Picked':f==='In Progress'?'🔵 In Progress':f==='Delayed'?'🔴 Delayed':f==='Completed'?'✅ Completed':f}</button>`).join('')}
     </div>
     <div class="team-grid">${teamCardsHtml || '<div class="empty-state">No one matches this filter right now — try another view.</div>'}</div>
 
@@ -1152,7 +1156,7 @@ function renderProjectCard(p, canEdit) {
   const editControls = canEdit ? `
     <div class="inline-edit-row">
       <select class="inline-select" onchange="updateProjectField('${p.projectId}','status',this.value)">
-        ${PROJECT_STATUSES.map(s => `<option value="${s}" ${p.status===s?'selected':''}>${s==='Open'?'Open / To Be Picked':s==='Delayed'?'Delayed (at risk of missing ETD)':s}</option>`).join('')}
+        ${PROJECT_STATUSES.map(s => `<option value="${s}" ${p.status===s?'selected':''}>${s==='Open'?'🟡 To Be Picked':s==='Completed'?'✅ Completed':s==='Delayed'?'🔴 Delayed':s==='In Progress'?'🔵 In Progress':s==='Delayed'?'Delayed (at risk of missing ETD)':s}</option>`).join('')}
       </select>
       ${isAdmin
         ? `<input type="date" class="inline-date" value="${formatDateInput(p.eta)}" onchange="updateProjectField('${p.projectId}','eta',this.value)">`
@@ -1685,7 +1689,7 @@ function openProjectModal() {
       <div class="field"><label>Project Name</label><input id="pmName" placeholder="e.g. 3PL Cost Optimisation"></div>
       <div class="field"><label>Objective *</label><textarea id="pmDesc" placeholder="What is this project meant to achieve?" required></textarea></div>
       <div class="field"><label>Status</label>
-        <select id="pmStatus">${PROJECT_STATUSES.filter(s => s !== 'Delayed').map(s => `<option value="${s}">${s==='Open'?'Open / To Be Picked':s}</option>`).join('')}</select>
+        <select id="pmStatus">${PROJECT_STATUSES.filter(s => s !== 'Delayed').map(s => `<option value="${s}">${s==='Open'?'🟡 To Be Picked':s==='Completed'?'✅ Completed':s==='Delayed'?'🔴 Delayed':s==='In Progress'?'🔵 In Progress':s}</option>`).join('')}</select>
       </div>
       <div class="field"><label>ETD</label><input type="date" id="pmEta"></div>
       <div class="field"><label>Impact *</label><input id="pmImpact" placeholder="e.g. What is the overall impact?" required></div>
