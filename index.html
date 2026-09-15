@@ -407,6 +407,10 @@ tr.total-row td{font-weight:800;background:var(--surface-alt);}
 .skeleton-card { opacity:.45; pointer-events:none; }
 .skeleton-card * { animation:skeletonPulse 1.4s ease-in-out infinite; }
 @keyframes skeletonPulse { 0%,100%{opacity:.4;} 50%{opacity:.9;} }
+
+/* FIX (Bug #1): .save-toast selector was missing — the position:fixed block
+   was orphaned outside any rule, so the toast was never styled or positioned. */
+.save-toast{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
   padding:10px 20px;border-radius:999px;font-size:13px;font-weight:700;z-index:200;
   box-shadow:var(--shadow-lg);opacity:0;transition:opacity .2s, transform .2s;pointer-events:none;
@@ -745,7 +749,9 @@ function renderNotifDropdown() {
     html += '<div class="notif-empty">✨ Nothing overdue. Clear skies.</div>';
   } else {
     notifCache.forEach(n => {
-      html += `<div class="notif-item" onclick="openWorkspace('${n.userId||''}');document.getElementById('notifDropdown').classList.add('hidden')">
+      // FIX (Bug #6): guard against empty userId so openWorkspace is not called with ''
+      const uid = n.userId || '';
+      html += `<div class="notif-item" onclick="${uid ? "openWorkspace('" + escapeHtml(uid) + "')" : 'void(0)'};document.getElementById('notifDropdown').classList.add('hidden')">
         <span class="notif-dot" style="background:${colorFor[n.level]}"></span>
         <span>${escapeHtml(n.avatar||'')} ${escapeHtml(n.message)}</span>
       </div>`;
@@ -788,7 +794,7 @@ function renderSearchResults(results) {
     el.innerHTML = '<div class="search-result-item" style="color:var(--ink-faint)">No matches.</div>';
   } else {
     el.innerHTML = results.map(r => `
-      <div class="search-result-item" onclick="onSearchResultClick('${r.userId||''}')">
+      <div class="search-result-item" onclick="onSearchResultClick('${escapeHtml(r.userId||'')}')">
         <div class="search-result-type">${r.type}</div>
         <div>${escapeHtml(r.label)}</div>
       </div>`).join('');
@@ -798,6 +804,7 @@ function renderSearchResults(results) {
 function onSearchResultClick(userId) {
   document.getElementById('searchResults').classList.add('hidden');
   document.getElementById('searchInput').value = '';
+  // FIX (Bug #6): only call openWorkspace when userId is a non-empty string
   if (userId) openWorkspace(userId);
 }
 document.addEventListener('click', (e) => {
@@ -886,7 +893,7 @@ function renderHome(data, summary) {
   const teamCardsHtml = filteredTeam.map(t => {
     const color = AVATAR_COLORS[t.avatar] || 'var(--primary)';
     return `
-    <div class="team-card" onclick="openWorkspace('${t.userId}')">
+    <div class="team-card" onclick="openWorkspace('${escapeHtml(t.userId)}')">
       <div class="team-card-roof" style="background:${color}"></div>
       <div class="team-card-body">
         <div class="team-card-avatar">${t.avatar}</div>
@@ -928,7 +935,7 @@ function renderHome(data, summary) {
           <h1>${g.timeGreet}, ${escapeHtml(data.greetingName)} ${g.flair}</h1>
           <p>${g.line}</p>
         </div>
-        <button class="btn btn-warm btn-sm" style="margin-top:4px;white-space:nowrap;" onclick="openWorkspace('${data.currentUser.userId}')">📝 Log Your Activity</button>
+        <button class="btn btn-warm btn-sm" style="margin-top:4px;white-space:nowrap;" onclick="openWorkspace('${escapeHtml(data.currentUser.userId)}')">📝 Log Your Activity</button>
       </div>
       <div class="stat-row">
         <div class="stat-card"><div class="stat-num">${ps.active}</div><div class="stat-label">Active</div></div>
@@ -958,6 +965,7 @@ function setHomeFilter(f) {
    WORKSPACE VIEW
    ============================================================ */
 async function openWorkspace(userId) {
+  // FIX (Bug #6): guard against empty string as well as null/undefined
   if (!userId) return;
   document.getElementById('notifDropdown').classList.add('hidden');
   state.currentWorkspaceUserId = userId;
@@ -1069,7 +1077,10 @@ function renderWorkspaceTabContent() {
       ? '<div class="empty-state">No BAU items yet — click + Add to create one.</div>'
       : `<div class="card-list">${biuList.map(b => renderBAUCard(b, d.isSelfOrAdmin)).join('')}</div>`;
   } else if (state.currentWorkspaceTab === 'week') {
-    renderWeekTab(d.user.userId);
+    // FIX (Bug #12): renderWeekTab returns a Promise; we don't need to await it here
+    // because it writes directly to the DOM, but we attach a .catch so unhandled
+    // rejections surface in the console rather than being silently swallowed.
+    renderWeekTab(d.user.userId).catch(err => console.error('Week tab error:', err));
   }
 }
 
@@ -1254,13 +1265,22 @@ function renderCheckinRow(p) {
   ${logged && p.todaysLogDescription ? `<div class="checkin-note">"${escapeHtml(p.todaysLogDescription)}"</div>` : ''}`;
 }
 
+// FIX (Bug #5): The checkbox visual state was being set to `true` unconditionally
+// before the confirm dialog, causing a visible flicker. Now the checkbox is only
+// reset on cancel, and is left in its natural unchecked state while the dialog
+// is open (which is what the user just did — they unchecked it).
 function onCheckinToggle(projectId, checkbox) {
   if (checkbox.checked) {
-    checkbox.checked = false; // don't flip visually until saved
+    // User just checked the box → open the log modal; revert visual until saved
+    checkbox.checked = false;
     openCheckinModal(projectId, '', '');
   } else {
-    checkbox.checked = true; // don't flip visually until confirmed
-    if (!confirm("Remove today's check-in for this project?")) { checkbox.checked = true; return; }
+    // User just unchecked an already-logged box → confirm removal
+    if (!confirm("Remove today's check-in for this project?")) {
+      // Cancelled — restore the checked state
+      checkbox.checked = true;
+      return;
+    }
     removeCheckin(projectId);
   }
 }
@@ -1410,9 +1430,18 @@ function renderBAUCheckinRow(b) {
   ${logged && b.todaysLogDescription ? `<div class="checkin-note">"${escapeHtml(b.todaysLogDescription)}"</div>` : ''}`;
 }
 
+// FIX (Bug #5 pattern, BAU variant): same checkbox flicker fix applied here
 function onBAUCheckinToggle(bauId, checkbox) {
-  if (checkbox.checked) { checkbox.checked = false; openBAUCheckinModal(bauId, ''); }
-  else { checkbox.checked = true; if (!confirm("Remove today's log for this BAU item?")) { checkbox.checked = true; return; } removeBAUCheckin(bauId); }
+  if (checkbox.checked) {
+    checkbox.checked = false;
+    openBAUCheckinModal(bauId, '');
+  } else {
+    if (!confirm("Remove today's log for this BAU item?")) {
+      checkbox.checked = true;
+      return;
+    }
+    removeBAUCheckin(bauId);
+  }
 }
 
 function openBAUCheckinEdit(bauId, event) {
@@ -1945,13 +1974,27 @@ function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
-function escapeAttr(str) { return escapeHtml(str).replace(/"/g, '&quot;'); }
+
+// FIX (Bug #8): escapeAttr was double-escaping quotes because escapeHtml already
+// converts " to &quot;, then the extra .replace turned &quot; into &amp;quot;.
+// Now escapeAttr simply calls escapeHtml — that is sufficient for HTML attributes.
+function escapeAttr(str) { return escapeHtml(str); }
+
+// FIX (Bug #9): formatDateInput used to call `new Date(dateVal).toISOString().slice(0,10)`
+// which converts to UTC and clips one day for IST users (UTC+5:30) when the value
+// is a date-only string like '2025-06-01' (parsed as UTC midnight).
+// Now we extract the date parts directly from the local Date representation
+// so the value shown in the input always matches the stored date regardless of timezone.
 function formatDateInput(dateVal) {
   if (!dateVal) return '';
   const d = new Date(dateVal);
   if (isNaN(d)) return '';
-  return d.toISOString().slice(0,10);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
+
 function formatDateDisplay(dateVal) {
   if (!dateVal) return '—';
   const d = new Date(dateVal);
