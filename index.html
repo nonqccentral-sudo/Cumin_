@@ -2008,6 +2008,186 @@ function formatDateTimeDisplay(dateVal) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' — ' +
          d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
+   // ============================================================================
+// NEW — REVISED ETA & ALL PROJECTS
+// ============================================================================
+
+function openReviseETAModal(projectId) {
+  var p = state.workspaceData && state.workspaceData.projects.find(function(x) { return x.projectId === projectId; });
+  if (!p) return;
+  var today = new Date().toISOString().slice(0, 10);
+  openModal(
+    '<div class="modal-header"><h2>📅 Revise ETD</h2><button class="modal-close" onclick="closeModal()">✕</button></div>' +
+    '<div class="modal-body">' +
+      '<div style="background:var(--surface-alt);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px;font-size:13px;">' +
+        '<span style="color:var(--ink-soft);">Planned ETD (locked): </span>' +
+        '<b>' + formatDateDisplay(p.eta) + '</b>' +
+        (p.revisedETA ? '<br><span style="color:var(--ink-soft);">Current Revised ETD: </span><b>' + formatDateDisplay(p.revisedETA) + '</b>' : '') +
+      '</div>' +
+      '<div class="field"><label>New Revised ETD *</label><input type="date" id="retaDate" min="' + today + '"></div>' +
+      '<div class="field" id="retaReasonWrap" style="display:none;">' +
+        '<label>Reason for change *</label>' +
+        '<textarea id="retaReason" placeholder="Why is the ETD being revised? Be specific."></textarea>' +
+      '</div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>' +
+      '<button id="btnReviseETA" class="btn btn-primary" onclick="submitReviseETA(\'' + projectId + '\')">Save Revision</button>' +
+    '</div>'
+  );
+  document.getElementById('retaDate').addEventListener('change', function() {
+    document.getElementById('retaReasonWrap').style.display = this.value ? '' : 'none';
+  });
+}
+
+async function submitReviseETA(projectId) {
+  await withLoading('btnReviseETA', 'Saving…', async () => {
+    var newETA  = val('retaDate');
+    var reason  = val('retaReason');
+    if (!newETA)  { showToast('⚠️ Please pick a new ETD'); return; }
+    if (!reason)  { showToast('⚠️ Reason is required'); return; }
+    if (isJunkDescription(reason)) { showToast('⚠️ Please give a specific reason'); return; }
+    var res = await apiCall('reviseETA', { projectId: projectId, newETA: newETA, reason: reason });
+    if (!res.ok) { showToast('⚠️ ' + res.error); return; }
+    closeModal();
+    showToast('✓ Revised ETD saved');
+    if (state.workspaceData) {
+      var idx = state.workspaceData.projects.findIndex(function(p) { return p.projectId === projectId; });
+      if (idx !== -1) {
+        state.workspaceData.projects[idx].revisedETA     = newETA;
+        state.workspaceData.projects[idx].latestRevision = reason;
+      }
+      renderWorkspaceTabContent();
+    }
+  });
+}
+
+async function openETAHistoryModal(projectId) {
+  openModal(
+    '<div class="modal-header"><h2>📋 ETD Revision History</h2><button class="modal-close" onclick="closeModal()">✕</button></div>' +
+    '<div class="modal-body" id="etaHistoryBody"><div style="text-align:center;color:var(--ink-faint);padding:20px;">Loading…</div></div>'
+  );
+  var res = await apiCall('getETAHistory', { projectId: projectId });
+  var body = document.getElementById('etaHistoryBody');
+  if (!body) return;
+  if (!res.ok) { body.innerHTML = '<div class="empty-state">⚠️ ' + escapeHtml(res.error) + '</div>'; return; }
+  var revs = res.data.revisions.filter(function(r) { return r.newETA; });
+  if (revs.length === 0) { body.innerHTML = '<div class="empty-state">No ETD revisions yet.</div>'; return; }
+  body.innerHTML = '<div class="card-list">' + revs.map(function(r) {
+    return '<div class="item-card" style="padding:12px 16px;">' +
+      '<div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-faint);margin-bottom:4px;">' + formatDateTimeDisplay(r.createdAt) + ' · ' + escapeHtml(r.revisedByName) + '</div>' +
+      '<div style="font-size:13px;margin-bottom:4px;"><span style="color:var(--ink-soft);">ETD changed to </span><b>' + formatDateDisplay(r.newETA) + '</b>' +
+        (r.oldETA ? '<span style="color:var(--ink-soft);"> from ' + formatDateDisplay(r.oldETA) + '</span>' : '') + '</div>' +
+      '<div style="font-size:13px;color:var(--ink-soft);font-style:italic;">"' + escapeHtml(r.reason) + '"</div>' +
+      (r.adminRemark ? '<div style="font-size:12px;margin-top:6px;padding:6px 10px;background:var(--warm-soft);border-radius:6px;color:var(--warm-dark);">👑 Admin: ' + escapeHtml(r.adminRemark) + '</div>' : '') +
+    '</div>';
+  }).join('') + '</div>';
+}
+
+function openAdminRemarkModal(projectId) {
+  openModal(
+    '<div class="modal-header"><h2>👑 Add Remark</h2><button class="modal-close" onclick="closeModal()">✕</button></div>' +
+    '<div class="modal-body">' +
+      '<div class="field"><label>Remark (optional)</label><textarea id="adminRemark" placeholder="Add a note on this project…"></textarea></div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>' +
+      '<button id="btnAdminRemark" class="btn btn-primary" onclick="submitAdminRemark(\'' + projectId + '\')">Save Remark</button>' +
+    '</div>'
+  );
+}
+
+async function submitAdminRemark(projectId) {
+  await withLoading('btnAdminRemark', 'Saving…', async () => {
+    var remark = val('adminRemark');
+    var res = await apiCall('addAdminRemark', { projectId: projectId, remark: remark });
+    if (!res.ok) { showToast('⚠️ ' + res.error); return; }
+    closeModal();
+    showToast('✓ Remark saved');
+  });
+}
+
+function renderRevisedETABlock(p, canEdit) {
+  var html = '';
+  if (p.startedOn) {
+    html += '<div style="font-size:12px;color:var(--ink-soft);margin-top:6px;">' +
+      '🚀 Project started on <b>' + formatDateDisplay(p.startedOn) + '</b></div>';
+  }
+  if (p.revisedETA) {
+    html += '<div style="margin-top:8px;padding:8px 12px;background:var(--amber-soft);border-radius:var(--radius-sm);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+      '<span style="font-size:12px;color:var(--amber);font-weight:700;">📅 Revised ETD: ' + formatDateDisplay(p.revisedETA) + '</span>' +
+      (p.latestRevision ? '<span style="font-size:12px;color:var(--ink-soft);font-style:italic;">— "' + escapeHtml(p.latestRevision) + '"</span>' : '') +
+      '<button class="link-btn" style="font-size:12px;margin-left:auto;" onclick="openETAHistoryModal(\'' + p.projectId + '\')">View history</button>' +
+    '</div>';
+  }
+  if (canEdit && p.status !== 'Completed') {
+    html += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">' +
+      '<button class="btn btn-ghost btn-sm" onclick="openReviseETAModal(\'' + p.projectId + '\\')">' +
+        (p.revisedETA ? '📅 Update Revised ETD' : '📅 Add Revised ETD') +
+      '</button>' +
+      (state.user.role === 'Admin'
+        ? '<button class="btn btn-ghost btn-sm" onclick="openAdminRemarkModal(\'' + p.projectId + '\\')">👑 Add Remark</button>'
+        : '') +
+    '</div>';
+  }
+  return html;
+}
+
+async function renderAllProjectsTab() {
+  var el = document.getElementById('mainContainer');
+  el.innerHTML =
+    '<button class="back-link" onclick="goHome()">← Back to Cumin</button>' +
+    '<div class="section-title">📋 All Projects</div>' +
+    '<div id="allProjectsContent" style="padding:30px;text-align:center;color:var(--ink-faint);">Loading…</div>';
+
+  var res = await apiCall('getAllProjects', {});
+  var content = document.getElementById('allProjectsContent');
+  if (!content) return;
+  if (!res.ok) { content.innerHTML = '<div class="empty-state">⚠️ ' + escapeHtml(res.error) + '</div>'; return; }
+
+  var projects = res.data.projects;
+  if (projects.length === 0) { content.innerHTML = '<div class="empty-state">No projects found.</div>'; return; }
+
+  var rows = projects.map(function(p) {
+    var statusPill = '<span class="pill ' + pillClassForDisplayStatus(p.displayStatus) + '">' + escapeHtml(p.displayStatus) + '</span>';
+    var priorityPill = '<span class="pill pill-priority-' + p.priority + '">' + p.priority + '</span>';
+    var revisedETAHtml = p.revisedETA
+      ? '<span style="color:var(--amber);font-weight:700;">' + formatDateDisplay(p.revisedETA) + '</span>' +
+        (p.revisionReason ? '<br><span style="font-size:11px;color:var(--ink-faint);font-style:italic;">"' + escapeHtml(p.revisionReason) + '"</span>' : '')
+      : '<span style="color:var(--ink-faint);">—</span>';
+    var adminRemarkHtml = p.adminRemark
+      ? '<span style="font-size:11.5px;background:var(--warm-soft);color:var(--warm-dark);padding:2px 8px;border-radius:4px;">👑 ' + escapeHtml(p.adminRemark) + '</span>'
+      : '';
+    var startedHtml = p.startedOn
+      ? '<span style="font-size:11px;color:var(--ink-faint);">🚀 ' + formatDateDisplay(p.startedOn) + '</span>'
+      : '<span style="color:var(--ink-faint);">—</span>';
+
+    return '<tr>' +
+      '<td style="font-family:var(--font-body);">' +
+        '<span style="cursor:pointer;font-weight:700;color:var(--primary);text-decoration:underline;" onclick="openWorkspace(\'' + escapeHtml(p.ownerUserId) + '\')">' +
+          escapeHtml(p.projectName) +
+        '</span>' +
+        (adminRemarkHtml ? '<br>' + adminRemarkHtml : '') +
+      '</td>' +
+      '<td style="font-family:var(--font-body);">' + escapeHtml(p.ownerName) + '</td>' +
+      '<td>' + statusPill + ' ' + priorityPill + '</td>' +
+      '<td>' + formatDateDisplay(p.eta) + '</td>' +
+      '<td>' + revisedETAHtml + '</td>' +
+      '<td>' + startedHtml + '</td>' +
+    '</tr>';
+  });
+
+  content.innerHTML =
+    '<div class="summary-table-wrap">' +
+    '<table>' +
+      '<thead><tr>' +
+        '<th>Project</th><th>Owner</th><th>Status</th>' +
+        '<th>Planned ETD</th><th>Revised ETD</th><th>Started On</th>' +
+      '</tr></thead>' +
+      '<tbody>' + rows.join('') + '</tbody>' +
+    '</table>' +
+    '</div>';
+}
 </script>
 </body>
 </html>
