@@ -991,6 +991,10 @@ function renderBAUCard(b, canEdit) {
   </div>`;
 }
 function renderBAUCheckinRow(b) {
+  // Guard: if BAU ID is missing in sheet data, show a warning instead of a broken checkbox
+  if (!b.bauId) {
+    return '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--red);">⚠️ BAU ID missing for this item — ask admin to run <code>backfillBAUIDs()</code> in Apps Script.</div>';
+  }
   const logged = !!b.loggedToday;
   return `<div class="checkin-row ${logged ? 'logged' : ''}" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
     <input type="checkbox" id="bau-checkin-${b.bauId}" ${logged ? 'checked' : ''} onchange="onBAUCheckinToggle('${b.bauId}', this)">
